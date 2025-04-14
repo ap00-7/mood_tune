@@ -42,7 +42,8 @@ emotion_to_mood = {
 
 @st.cache_data
 def load_data():
-    df = pd.read_csv("spotify_tracks.csv")
+    csv_path = os.path.join(os.path.dirname(__file__), "spotify_tracks.csv")
+    df = pd.read_csv(csv_path)
     df = df.dropna(subset=["track_name", "artist_name", "valence", "energy", "artwork_url", "track_url"])
     df['mood'] = df.apply(lambda row: get_mood(row['valence'], row['energy']), axis=1)
     return df
