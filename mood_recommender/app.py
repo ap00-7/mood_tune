@@ -4,6 +4,7 @@ from transformers import pipeline
 from PIL import Image
 import base64
 from io import BytesIO
+import os
 
 emotion_classifier = pipeline(
     "text-classification",
@@ -76,7 +77,8 @@ def image_to_base64(image_path):
     img_str = base64.b64encode(buffer.getvalue()).decode()
     return img_str
 
-img_base64 = image_to_base64("logo.png")
+image_path = os.path.join(os.path.dirname(__file__), "logo.png")
+img_base64 = image_to_base64(image_path)
 
 st.markdown(f"""
     <div style="text-align: center; margin-top: 30px; margin-bottom: 40px;">
