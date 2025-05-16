@@ -65,11 +65,22 @@ def detect_mood_from_text(text):
     st.info(f"🎭 Detected Emotion: **{emotion.capitalize()}**")
     return emotion_to_mood.get(emotion, "chill")
 
-def recommend_songs(df, mood, n=5):
+
+def recommend_songs(df, mood, language="All", n=5):
+    # Filter by mood first
     mood_df = df[df['mood'] == mood]
+
+    # If a specific language is selected (not "All"), filter by that language (case-insensitive)
+    if language != "All":
+        mood_df = mood_df[mood_df['language'].str.lower() == language.lower()]
+
+    # If fewer songs available than requested, adjust n
     if len(mood_df) < n:
         n = len(mood_df)
+
+    # Return random sample
     return mood_df[['track_name', 'artist_name', 'valence', 'energy', 'artwork_url', 'track_url']].sample(n)
+
 
 def image_to_base64(image_path):
     img = Image.open(image_path)
@@ -83,7 +94,7 @@ img_base64 = image_to_base64(image_path)
 
 st.markdown(f"""
     <div style="text-align: center; margin-top: 30px; margin-bottom: 40px;">
-        <img src="data:image/png;base64,{img_base64}" class="logo" />
+        <img src="data:image/png;base64,{img_base64}" class="logo" alt="MoodTune Logo" />
         <h1>MoodTune</h1>
         <h4>Your personal mood-based Spotify song recommender</h4>
     </div>
@@ -160,83 +171,86 @@ st.markdown(f"""
 
 
 user_input = st.text_input("📝 Describe how you're feeling:", placeholder="e.g. I feel super relaxed today")
+languages = ["All", "English", "Hindi", "Tamil", "Telugu", "Malayalam"] 
+selected_language = st.selectbox("Select Language:", options=languages)
+
 
 if user_input:
     detected_mood = detect_mood_from_text(user_input)
     st.success(f"🧠 Detected Mood: **{detected_mood.capitalize()}**")
 
     df = load_data()
-    songs = recommend_songs(df, detected_mood)
+    songs = recommend_songs(df, detected_mood, selected_language)
 
     st.subheader("🎶 Recommended Songs for You:")
     if len(songs) == 0:
-        st.warning("😢 Sorry, no songs found for this mood.")
+        st.warning("😢 Sorry, no songs found for this mood and language.")
     else:
         for index, row in songs.iterrows():
-                    st.markdown(f"""
-        <style>
-            .song-card {{
-                background: linear-gradient(145deg, #1e1e1e, #111111);
-                border-radius: 16px;
-                padding: 20px;
-                margin-bottom: 25px;
-                display: flex;
-                align-items: center;
-                box-shadow: 0 0 20px rgba(29, 185, 84, 0.2), 0 0 30px rgba(0, 0, 0, 0.6);
-                animation: fadeInSlide 0.8s ease-in-out;
-                transition: transform 0.3s ease, box-shadow 0.3s ease;
-            }}
-            .song-card:hover {{
-                transform: scale(1.015);
-                box-shadow: 0 0 25px rgba(29, 185, 84, 0.4), 0 0 35px rgba(0, 0, 0, 0.7);
-            }}
-            .song-info {{
-                margin-left: 20px;
-            }}
-            .song-title {{
-                color: #ffffff;
-                font-size: 1.2rem;
-                font-weight: bold;
-                margin: 0;
-            }}
-            .song-artist {{
-                color: #bbbbbb;
-                font-size: 0.95rem;
-                margin: 4px 0;
-            }}
-            .song-meta {{
-                color: #1DB954;
-                font-size: 0.9rem;
-                margin-top: 6px;
-            }}
-            .spotify-button {{
-                display: inline-block;
-                background: linear-gradient(to right, #1DB954, #1ed760);
-                color: #000;
-                font-weight: bold;
-                padding: 8px 16px;
-                border-radius: 8px;
-                text-decoration: none;
-                margin-top: 10px;
-                box-shadow: 0 0 10px rgba(29, 185, 84, 0.6);
-                transition: background 0.3s ease;
-            }}
-            .spotify-button:hover {{
-                background: linear-gradient(to right, #1ed760, #1DB954);
-            }}
-            @keyframes fadeInSlide {{
-                0% {{ opacity: 0; transform: translateY(30px); }}
-                100% {{ opacity: 1; transform: translateY(0); }}
-            }}
-        </style>
+            st.markdown(f"""
+            <style>
+                .song-card {{
+                    background: linear-gradient(145deg, #1e1e1e, #111111);
+                    border-radius: 16px;
+                    padding: 20px;
+                    margin-bottom: 25px;
+                    display: flex;
+                    align-items: center;
+                    box-shadow: 0 0 20px rgba(29, 185, 84, 0.2), 0 0 30px rgba(0, 0, 0, 0.6);
+                    animation: fadeInSlide 0.8s ease-in-out;
+                    transition: transform 0.3s ease, box-shadow 0.3s ease;
+                }}
+                .song-card:hover {{
+                    transform: scale(1.015);
+                    box-shadow: 0 0 25px rgba(29, 185, 84, 0.4), 0 0 35px rgba(0, 0, 0, 0.7);
+                }}
+                .song-info {{
+                    margin-left: 20px;
+                }}
+                .song-title {{
+                    color: #ffffff;
+                    font-size: 1.2rem;
+                    font-weight: bold;
+                    margin: 0;
+                }}
+                .song-artist {{
+                    color: #bbbbbb;
+                    font-size: 0.95rem;
+                    margin: 4px 0;
+                }}
+                .song-meta {{
+                    color: #1DB954;
+                    font-size: 0.9rem;
+                    margin-top: 6px;
+                }}
+                .spotify-button {{
+                    display: inline-block;
+                    background: linear-gradient(to right, #1DB954, #1ed760);
+                    color: #000;
+                    font-weight: bold;
+                    padding: 8px 16px;
+                    border-radius: 8px;
+                    text-decoration: none;
+                    margin-top: 10px;
+                    box-shadow: 0 0 10px rgba(29, 185, 84, 0.6);
+                    transition: background 0.3s ease;
+                }}
+                .spotify-button:hover {{
+                    background: linear-gradient(to right, #1ed760, #1DB954);
+                }}
+                @keyframes fadeInSlide {{
+                    0% {{ opacity: 0; transform: translateY(30px); }}
+                    100% {{ opacity: 1; transform: translateY(0); }}
+                }}
+            </style>
 
-        <div class="song-card">
-            <img src="{row['artwork_url']}" width="100" style="border-radius: 10px;" />
-            <div class="song-info">
-                <p class="song-title">🎵 {row['track_name']}</p>
-                <p class="song-artist">👤 <i>{row['artist_name']}</i></p>
-                <p class="song-meta">🎚️ Valence: {row['valence']:.2f} | Energy: {row['energy']:.2f}</p>
-                <a href="{row['track_url']}" target="_blank" class="spotify-button">▶️ Play on Spotify</a>
+            <div class="song-card">
+                <img src="{row['artwork_url']}" width="100" style="border-radius: 10px;" alt="Album Art" />
+                <div class="song-info">
+                    <p class="song-title">🎵 {row['track_name']}</p>
+                    <p class="song-artist">👤 <i>{row['artist_name']}</i></p>
+                    <p class="song-meta">🎚️ Valence: {row['valence']:.2f} | Energy: {row['energy']:.2f}</p>
+                    <a href="{row['track_url']}" target="_blank" class="spotify-button" rel="noopener noreferrer">▶️ Play on Spotify</a>
+                </div>
             </div>
-        </div>
-    """, unsafe_allow_html=True)
+            """, unsafe_allow_html=True)
