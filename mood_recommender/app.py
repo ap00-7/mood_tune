@@ -169,10 +169,10 @@ st.markdown(f"""
     </style>
 """, unsafe_allow_html=True)
 
-
-user_input = st.text_input("📝 Describe how you're feeling:", placeholder="e.g. I feel super relaxed today")
-languages = ["All", "English", "Hindi", "Tamil", "Telugu", "Malayalam"] 
+languages = ["All", "English", "Hindi", "Tamil", "Telugu", "Malayalam","Korean"] 
 selected_language = st.selectbox("Select Language:", options=languages)
+user_input = st.text_input("📝 Describe how you're feeling:", placeholder="e.g. I feel super relaxed today")
+
 
 
 if user_input:
