@@ -59,12 +59,14 @@ def get_mood(valence, energy):
         return 'chill'
 
 def detect_mood_from_text(text):
-    result = emotion_classifier(text)
-    emotion = result[0]['label'].lower()
-
-    st.info(f"🎭 Detected Emotion: **{emotion.capitalize()}**")
-    return emotion_to_mood.get(emotion, "chill")
-
+    try:
+        result = emotion_classifier(text)
+        emotion = result[0]['label'].lower()
+        st.info(f"🎭 Detected Emotion: **{emotion.capitalize()}**")
+        return emotion_to_mood.get(emotion, "chill")
+    except Exception as e:
+        st.error(f"Failed to detect mood: {e}")
+        return "chill"
 
 def recommend_songs(df, mood, language="All", n=5):
     # Filter by mood first
