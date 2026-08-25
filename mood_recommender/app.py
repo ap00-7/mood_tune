@@ -213,6 +213,7 @@ st.markdown(f"""
     .hero h1 {{ color: var(--ink); font-size: clamp(2.8rem, 7vw, 5.8rem); line-height: 0.94; letter-spacing: -0.04em; margin: 0; }}
     .hero p {{ color: var(--muted); font-size: 1.1rem; line-height: 1.55; max-width: 540px; margin-top: 1.2rem; }}
     .control-label {{ color: var(--ink); font-size: 0.8rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; margin: 0 0 0.5rem; }}
+    .stTextInput label, .stSelectbox label, .stSlider label {{ color: var(--ink) !important; }}
     .stTextInput input, .stSelectbox [data-baseweb="select"] > div {{ background: var(--surface); border: 1px solid var(--line); color: var(--ink); border-radius: 10px; }}
     .stTextInput input:focus {{ border-color: var(--green); box-shadow: 0 0 0 2px rgba(31, 157, 97, 0.14); }}
     .stSlider [data-baseweb="slider"] div[role="slider"] {{ background: var(--green); }}
