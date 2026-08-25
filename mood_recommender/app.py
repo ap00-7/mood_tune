@@ -181,15 +181,21 @@ def get_mood(valence, energy):
     else:
         return 'chill'
 
+@st.cache_data
+def classify_mood(text):
+    cleaned_text = " ".join(text.split())
+    predictions = load_emotion_classifier()(cleaned_text, truncation=True, max_length=512)
+    if predictions and isinstance(predictions[0], list):
+        predictions = predictions[0]
+    emotion = predictions[0]["label"].lower()
+    return emotion, emotion_to_mood.get(emotion, "chill")
+
+
 def detect_mood_from_text(text):
     try:
-        cleaned_text = " ".join(text.split())
-        predictions = load_emotion_classifier()(cleaned_text, truncation=True, max_length=512)
-        if predictions and isinstance(predictions[0], list):
-            predictions = predictions[0]
-        emotion = predictions[0]['label'].lower()
+        emotion, mood = classify_mood(text)
         st.info(f"🎭 Detected Emotion: **{emotion.capitalize()}**")
-        return emotion_to_mood.get(emotion, "chill")
+        return mood
     except Exception as e:
         st.error(f"Failed to detect mood: {e}")
         return "chill"
@@ -301,40 +307,34 @@ if "liked_songs" not in st.session_state:
 if "feedback" not in st.session_state:
     st.session_state.feedback = {}
 
-with st.form("generation_form"):
-    controls = st.columns([2.7, 1.25, 1.1], gap="large")
-    with controls[0]:
-        user_input = st.text_input("What is the mood?", placeholder="e.g. I feel super relaxed today", label_visibility="visible")
-    with controls[1]:
-        selected_language = st.selectbox("Language", options=languages)
-    with controls[2]:
-        result_count = st.slider("Picks", min_value=3, max_value=10, value=5)
+controls = st.columns([2.7, 1.25, 1.1], gap="large")
+with controls[0]:
+    user_input = st.text_input("What is the mood?", placeholder="e.g. I feel super relaxed today", label_visibility="visible")
+with controls[1]:
+    selected_language = st.selectbox("Language", options=languages)
+with controls[2]:
+    result_count = st.slider("Picks", min_value=3, max_value=10, value=5)
 
-    with st.expander("Tune your recommendations"):
-        preference_columns = st.columns(2)
-        with preference_columns[0]:
-            min_energy = st.slider("Minimum energy", 0.0, 1.0, 0.0, 0.05)
-        with preference_columns[1]:
-            min_danceability = st.slider("Minimum danceability", 0.0, 1.0, 0.0, 0.05)
-
-    generate = st.form_submit_button("Generate my queue", use_container_width=True)
+with st.expander("Tune your recommendations"):
+    preference_columns = st.columns(2)
+    with preference_columns[0]:
+        min_energy = st.slider("Minimum energy", 0.0, 1.0, 0.0, 0.05)
+    with preference_columns[1]:
+        min_danceability = st.slider("Minimum danceability", 0.0, 1.0, 0.0, 0.05)
 
 selected_mood = user_input.strip()
 refresh = st.button("↻  Refresh picks", use_container_width=True)
 
-if generate:
-    if not selected_mood:
-        st.warning("Describe your mood first.")
-    else:
-        active_mood = detect_mood_from_text(selected_mood)
-        st.session_state.generation_id = st.session_state.get("generation_id", 0) + 1
-        st.session_state.generated_request = {
-            "mood": active_mood,
-            "language": selected_language,
-            "count": result_count,
-            "min_energy": min_energy,
-            "min_danceability": min_danceability,
-        }
+if selected_mood:
+    active_mood = detect_mood_from_text(selected_mood)
+    st.session_state.generation_id = st.session_state.get("generation_id", 0) + 1
+    st.session_state.generated_request = {
+        "mood": active_mood,
+        "language": selected_language,
+        "count": result_count,
+        "min_energy": min_energy,
+        "min_danceability": min_danceability,
+    }
 
 if refresh:
     if "generated_request" not in st.session_state:
