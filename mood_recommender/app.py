@@ -136,7 +136,7 @@ emotion_to_mood = {
 
 @st.cache_data
 def load_data():
-    data_dir = os.path.dirname(__file__)
+    data_dir = os.path.join(os.path.dirname(__file__), "datasets")
     csv_paths = glob(os.path.join(data_dir, "*.csv"))
     frames = []
     for csv_path in csv_paths:
