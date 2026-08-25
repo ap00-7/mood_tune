@@ -6,6 +6,8 @@ import base64
 from io import BytesIO
 import html
 import os
+from glob import glob
+from urllib.parse import quote_plus
 
 st.set_page_config(page_title="MoodTune", page_icon="🎧", layout="wide")
 
@@ -134,9 +136,39 @@ emotion_to_mood = {
 
 @st.cache_data
 def load_data():
-    csv_path = os.path.join(os.path.dirname(__file__), "spotify_tracks.csv")
-    df = pd.read_csv(csv_path)
-    df = df.dropna(subset=["track_name", "artist_name", "valence", "energy", "artwork_url", "track_url"])
+    data_dir = os.path.dirname(__file__)
+    csv_paths = glob(os.path.join(data_dir, "*.csv"))
+    frames = []
+    for csv_path in csv_paths:
+        source_name = os.path.splitext(os.path.basename(csv_path))[0]
+        source_df = pd.read_csv(csv_path)
+        source_df = source_df.rename(columns={
+            "song_name": "track_name",
+            "singer": "artist_name",
+            "artists": "artist_name",
+            "Valence": "valence",
+        })
+        if "language" not in source_df:
+            source_df["language"] = "Global" if source_name == "dataset" else source_name
+        if "track_url" not in source_df:
+            source_df["track_url"] = source_df.apply(
+                lambda row: "https://open.spotify.com/search/" + quote_plus(
+                    f"{row.get('track_name', '')} {row.get('artist_name', '')}"
+                ),
+                axis=1,
+            )
+        if "artwork_url" not in source_df:
+            source_df["artwork_url"] = "https://placehold.co/300x300/F4F1EA/17221F?text=MoodTune"
+        frames.append(source_df)
+
+    df = pd.concat(frames, ignore_index=True, sort=False)
+    required_columns = ["track_name", "artist_name", "valence", "energy", "danceability", "artwork_url", "track_url", "language"]
+    df = df.dropna(subset=required_columns)
+    for numeric_column in ["valence", "energy", "danceability"]:
+        df[numeric_column] = pd.to_numeric(df[numeric_column], errors="coerce")
+    df = df.dropna(subset=["valence", "energy", "danceability"])
+    df["language"] = df["language"].astype(str).str.strip()
+    df = df.drop_duplicates(subset=["track_name", "artist_name", "language"])
     df['mood'] = df.apply(lambda row: get_mood(row['valence'], row['energy']), axis=1)
     return df
 
@@ -255,7 +287,8 @@ st.markdown(f"""
     </div>
 """, unsafe_allow_html=True)
 
-languages = ["All", "English", "Hindi", "Tamil", "Telugu", "Malayalam", "Korean"]
+df = load_data()
+languages = ["All"] + sorted(df["language"].dropna().unique().tolist())
 presets = {
     "Describe my mood": None,
     "Deep focus": "chill",
@@ -298,7 +331,6 @@ if refresh and active_mood:
 if active_mood:
     st.success(f"Mood match: **{active_mood.capitalize()}**")
 
-    df = load_data()
     queue_signature = (active_mood, selected_language, result_count, min_energy, min_danceability)
     if st.session_state.get("queue_signature") != queue_signature:
         st.session_state.songs = recommend_songs(
