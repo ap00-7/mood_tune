@@ -206,12 +206,21 @@ def recommend_songs(df, mood, language="All", n=5, min_energy=0.0, min_danceabil
 
     # If a specific language is selected (not "All"), filter by that language (case-insensitive)
     if language != "All":
+        language_df = df[df['language'].str.lower() == language.lower()]
         mood_df = mood_df[mood_df['language'].str.lower() == language.lower()]
+    else:
+        language_df = df
+
+    if mood_df.empty:
+        mood_df = language_df
 
     mood_df = mood_df[
         (mood_df['energy'] >= min_energy)
         & (mood_df['danceability'] >= min_danceability)
     ]
+
+    if mood_df.empty:
+        mood_df = language_df
 
     # If fewer songs available than requested, adjust n
     if len(mood_df) < n:
