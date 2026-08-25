@@ -4,13 +4,20 @@ from transformers import pipeline
 from PIL import Image
 import base64
 from io import BytesIO
+import html
 import os
 
-emotion_classifier = pipeline(
-    "text-classification",
-    model="j-hartmann/emotion-english-distilroberta-base",
-    return_all_scores=False
-)
+st.set_page_config(page_title="MoodTune", page_icon="🎧", layout="wide")
+
+@st.cache_resource
+def load_emotion_classifier():
+    return pipeline(
+        "text-classification",
+        model="j-hartmann/emotion-english-distilroberta-base",
+        return_all_scores=False
+    )
+
+emotion_classifier = load_emotion_classifier()
 
 emotion_to_mood = {
     "admiration": "happy",
@@ -180,164 +187,101 @@ image_path = os.path.join(os.path.dirname(__file__), "logo.png")
 img_base64 = image_to_base64(image_path)
 
 st.markdown(f"""
-    <div style="text-align: center; margin-top: 30px; margin-bottom: 40px;">
-        <img src="data:image/png;base64,{img_base64}" class="logo" alt="MoodTune Logo" />
-        <h1>MoodTune</h1>
-        <h4>Your personal mood-based Spotify song recommender</h4>
+    <style>
+    :root {{
+        --ink: #17221f;
+        --muted: #6d7771;
+        --paper: #f4f1ea;
+        --surface: #fffdf8;
+        --line: #ddd8ce;
+        --lime: #c9f15b;
+        --coral: #ff6b4a;
+        --green: #1f9d61;
+    }}
+    .stApp {{
+        background: radial-gradient(circle at 90% 0%, #e8f3cc 0, transparent 28%), var(--paper);
+        color: var(--ink);
+    }}
+    [data-testid="stHeader"] {{ background: transparent; }}
+    [data-testid="stAppViewContainer"] > .main {{ padding-top: 2rem; }}
+    .block-container {{ max-width: 1120px; padding-bottom: 4rem; }}
+    .brand-row {{ display: flex; align-items: center; gap: 14px; margin-bottom: 3rem; }}
+    .brand-mark {{ width: 54px; height: 54px; border-radius: 16px; object-fit: cover; box-shadow: 7px 7px 0 var(--coral); }}
+    .brand-name {{ color: var(--ink); font-size: 1.1rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; }}
+    .hero {{ max-width: 760px; margin-bottom: 2.4rem; animation: rise 0.6s ease-out; }}
+    .kicker {{ color: var(--coral); font-size: 0.78rem; font-weight: 800; letter-spacing: 0.14em; text-transform: uppercase; margin-bottom: 0.75rem; }}
+    .hero h1 {{ color: var(--ink); font-size: clamp(2.8rem, 7vw, 5.8rem); line-height: 0.94; letter-spacing: -0.04em; margin: 0; }}
+    .hero p {{ color: var(--muted); font-size: 1.1rem; line-height: 1.55; max-width: 540px; margin-top: 1.2rem; }}
+    .control-label {{ color: var(--ink); font-size: 0.8rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; margin: 0 0 0.5rem; }}
+    .stTextInput input, .stSelectbox [data-baseweb="select"] > div {{ background: var(--surface); border: 1px solid var(--line); color: var(--ink); border-radius: 10px; }}
+    .stTextInput input:focus {{ border-color: var(--green); box-shadow: 0 0 0 2px rgba(31, 157, 97, 0.14); }}
+    .stSlider [data-baseweb="slider"] div[role="slider"] {{ background: var(--green); }}
+    .stButton button {{ background: var(--ink); border: 0; border-radius: 10px; color: white; font-weight: 700; min-height: 42px; width: 100%; }}
+    .stButton button:hover {{ background: var(--green); color: white; }}
+    .stAlert {{ border-radius: 10px; border: 1px solid var(--line); }}
+    .section-heading {{ border-top: 1px solid var(--line); display: flex; justify-content: space-between; margin-top: 2.7rem; padding-top: 1.2rem; }}
+    .section-heading h2 {{ color: var(--ink); font-size: 1.55rem; margin: 0; }}
+    .section-heading span {{ color: var(--muted); font-size: 0.85rem; padding-top: 0.35rem; }}
+    .song-card {{ align-items: center; animation: rise 0.6s ease-out both; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; display: flex; gap: 18px; margin: 14px 0; padding: 14px; transition: border-color 0.2s ease, transform 0.2s ease; }}
+    .song-card:hover {{ border-color: var(--green); transform: translateY(-2px); }}
+    .song-art {{ aspect-ratio: 1; border-radius: 10px; object-fit: cover; width: 88px; }}
+    .song-info {{ min-width: 0; }}
+    .song-title {{ color: var(--ink); font-size: 1.05rem; font-weight: 800; margin: 0; overflow-wrap: anywhere; }}
+    .song-artist {{ color: var(--muted); font-size: 0.9rem; margin: 3px 0 8px; overflow-wrap: anywhere; }}
+    .song-meta {{ color: var(--green); font-size: 0.78rem; font-weight: 700; letter-spacing: 0.03em; margin: 0; }}
+    .spotify-button {{ background: var(--lime); border-radius: 8px; color: var(--ink); display: inline-block; font-size: 0.8rem; font-weight: 800; margin-top: 10px; padding: 7px 11px; text-decoration: none; }}
+    .spotify-button:hover {{ color: var(--ink); background: #b7e53e; }}
+    @keyframes rise {{ from {{ opacity: 0; transform: translateY(12px); }} to {{ opacity: 1; transform: translateY(0); }} }}
+    @media (max-width: 640px) {{ .brand-row {{ margin-bottom: 2rem; }} .hero h1 {{ font-size: 3.2rem; }} .song-card {{ align-items: flex-start; }} .song-art {{ width: 72px; }} .section-heading {{ display: block; }} }}
+    </style>
+    <div class="brand-row">
+        <img src="data:image/png;base64,{img_base64}" class="brand-mark" alt="MoodTune logo" />
+        <span class="brand-name">MoodTune</span>
+    </div>
+    <div class="hero">
+        <div class="kicker">Soundtrack your state of mind</div>
+        <h1>Find the sound<br />that fits today.</h1>
+        <p>Describe the moment. MoodTune reads the feeling and builds a short, personal listening queue.</p>
     </div>
 """, unsafe_allow_html=True)
 
+languages = ["All", "English", "Hindi", "Tamil", "Telugu", "Malayalam", "Korean"]
+controls = st.columns([2.4, 1.25, 1.1], gap="large")
+with controls[0]:
+    user_input = st.text_input("What is the mood?", placeholder="e.g. I feel super relaxed today", label_visibility="visible")
+with controls[1]:
+    selected_language = st.selectbox("Language", options=languages)
+with controls[2]:
+    result_count = st.slider("Picks", min_value=3, max_value=10, value=5)
 
-st.markdown(f"""
-    <style>
-    body, .stApp {{
-        background: linear-gradient(160deg, #0d0d0d, #1a1a1a);
-        color: #f5f5f5;
-        font-family: 'Segoe UI', sans-serif;
-        scroll-behavior: smooth;
-    }}
-
-    .logo {{
-        animation: glowBounce 2s infinite;
-        width: 120px;
-        border-radius: 50%;
-        box-shadow: 0 0 25px #1DB954, 0 0 50px #1DB954;
-    }}
-
-    @keyframes glowBounce {{
-        0%, 100% {{ transform: translateY(0); box-shadow: 0 0 25px #1DB954; }}
-        50% {{ transform: translateY(-10px); box-shadow: 0 0 45px #1DB954; }}
-    }}
-
-    .stTextInput>div>div>input {{
-        background-color: #222;
-        color: #fff;
-        border: 1px solid #1DB954;
-        border-radius: 10px;
-        padding: 12px;
-        font-size: 16px;
-        transition: all 0.3s ease;
-    }}
-    .stTextInput>div>div>input:focus {{
-        box-shadow: 0 0 10px #1DB954;
-    }}
-
-    .stAlert {{
-        border-radius: 10px !important;
-        animation: fadeInScale 0.5s ease-out;
-    }}
-
-    @keyframes fadeInScale {{
-        0% {{ opacity: 0; transform: scale(0.95); }}
-        100% {{ opacity: 1; transform: scale(1); }}
-    }}
-
-    .stMarkdown h1, .stMarkdown h4 {{
-        color: #1DB954;
-        font-weight: bold;
-        animation: glowIn 1.2s ease;
-    }}
-    @keyframes glowIn {{
-        0% {{ opacity: 0; text-shadow: none; }}
-        100% {{ opacity: 1; text-shadow: 0 0 8px #1DB954; }}
-    }}
-
-    hr {{
-        border-top: 1px solid #1DB954;
-        margin-top: 10px;
-        margin-bottom: 30px;
-    }}
-
-    .stMarkdown h2 {{
-        color: #f5f5f5;
-        text-shadow: 0 0 6px #1DB954;
-        margin-top: 20px;
-    }}
-    </style>
-""", unsafe_allow_html=True)
-
-languages = ["All", "English", "Hindi", "Tamil", "Telugu", "Malayalam","Korean"] 
-selected_language = st.selectbox("Select Language:", options=languages)
-user_input = st.text_input("📝 Describe how you're feeling:", placeholder="e.g. I feel super relaxed today")
-
-
+refresh = st.button("↻  Refresh picks", use_container_width=True)
+if refresh and user_input:
+    st.rerun()
 
 if user_input:
     detected_mood = detect_mood_from_text(user_input)
-    st.success(f"🧠 Detected Mood: **{detected_mood.capitalize()}**")
+    st.success(f"Mood match: **{detected_mood.capitalize()}**")
 
     df = load_data()
-    songs = recommend_songs(df, detected_mood, selected_language)
+    songs = recommend_songs(df, detected_mood, selected_language, result_count)
 
-    st.subheader("🎶 Recommended Songs for You:")
+    st.markdown(f"<div class=\"section-heading\"><h2>Your listening queue</h2><span>{len(songs)} picks · {selected_language}</span></div>", unsafe_allow_html=True)
     if len(songs) == 0:
-        st.warning("😢 Sorry, no songs found for this mood and language.")
+        st.warning("No songs found for this mood and language. Try another language.")
     else:
         for index, row in songs.iterrows():
+            track_name = html.escape(str(row["track_name"]))
+            artist_name = html.escape(str(row["artist_name"]))
+            artwork_url = html.escape(str(row["artwork_url"]), quote=True)
+            track_url = html.escape(str(row["track_url"]), quote=True)
             st.markdown(f"""
-            <style>
-                .song-card {{
-                    background: linear-gradient(145deg, #1e1e1e, #111111);
-                    border-radius: 16px;
-                    padding: 20px;
-                    margin-bottom: 25px;
-                    display: flex;
-                    align-items: center;
-                    box-shadow: 0 0 20px rgba(29, 185, 84, 0.2), 0 0 30px rgba(0, 0, 0, 0.6);
-                    animation: fadeInSlide 0.8s ease-in-out;
-                    transition: transform 0.3s ease, box-shadow 0.3s ease;
-                }}
-                .song-card:hover {{
-                    transform: scale(1.015);
-                    box-shadow: 0 0 25px rgba(29, 185, 84, 0.4), 0 0 35px rgba(0, 0, 0, 0.7);
-                }}
-                .song-info {{
-                    margin-left: 20px;
-                }}
-                .song-title {{
-                    color: #ffffff;
-                    font-size: 1.2rem;
-                    font-weight: bold;
-                    margin: 0;
-                }}
-                .song-artist {{
-                    color: #bbbbbb;
-                    font-size: 0.95rem;
-                    margin: 4px 0;
-                }}
-                .song-meta {{
-                    color: #1DB954;
-                    font-size: 0.9rem;
-                    margin-top: 6px;
-                }}
-                .spotify-button {{
-                    display: inline-block;
-                    background: linear-gradient(to right, #1DB954, #1ed760);
-                    color: #000;
-                    font-weight: bold;
-                    padding: 8px 16px;
-                    border-radius: 8px;
-                    text-decoration: none;
-                    margin-top: 10px;
-                    box-shadow: 0 0 10px rgba(29, 185, 84, 0.6);
-                    transition: background 0.3s ease;
-                }}
-                .spotify-button:hover {{
-                    background: linear-gradient(to right, #1ed760, #1DB954);
-                }}
-                @keyframes fadeInSlide {{
-                    0% {{ opacity: 0; transform: translateY(30px); }}
-                    100% {{ opacity: 1; transform: translateY(0); }}
-                }}
-            </style>
-
             <div class="song-card">
-                <img src="{row['artwork_url']}" width="100" style="border-radius: 10px;" alt="Album Art" />
+                <img src="{artwork_url}" class="song-art" alt="Album art" />
                 <div class="song-info">
-                    <p class="song-title">🎵 {row['track_name']}</p>
-                    <p class="song-artist">👤 <i>{row['artist_name']}</i></p>
-                    <p class="song-meta">🎚️ Valence: {row['valence']:.2f} | Energy: {row['energy']:.2f}</p>
-                    <a href="{row['track_url']}" target="_blank" class="spotify-button" rel="noopener noreferrer">▶️ Play on Spotify</a>
+                    <p class="song-title">{track_name}</p>
+                    <p class="song-artist">{artist_name}</p>
+                    <p class="song-meta">VALENCE {row['valence']:.2f} &nbsp; / &nbsp; ENERGY {row['energy']:.2f}</p>
+                    <a href="{track_url}" target="_blank" class="spotify-button" rel="noopener noreferrer">Play on Spotify ↗</a>
                 </div>
             </div>
             """, unsafe_allow_html=True)
