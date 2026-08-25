@@ -301,23 +301,25 @@ if "liked_songs" not in st.session_state:
 if "feedback" not in st.session_state:
     st.session_state.feedback = {}
 
-controls = st.columns([2.7, 1.25, 1.1], gap="large")
-with controls[0]:
-    user_input = st.text_input("What is the mood?", placeholder="e.g. I feel super relaxed today", label_visibility="visible")
-with controls[1]:
-    selected_language = st.selectbox("Language", options=languages)
-with controls[2]:
-    result_count = st.slider("Picks", min_value=3, max_value=10, value=5)
+with st.form("generation_form"):
+    controls = st.columns([2.7, 1.25, 1.1], gap="large")
+    with controls[0]:
+        user_input = st.text_input("What is the mood?", placeholder="e.g. I feel super relaxed today", label_visibility="visible")
+    with controls[1]:
+        selected_language = st.selectbox("Language", options=languages)
+    with controls[2]:
+        result_count = st.slider("Picks", min_value=3, max_value=10, value=5)
 
-with st.expander("Tune your recommendations"):
-    preference_columns = st.columns(2)
-    with preference_columns[0]:
-        min_energy = st.slider("Minimum energy", 0.0, 1.0, 0.0, 0.05)
-    with preference_columns[1]:
-        min_danceability = st.slider("Minimum danceability", 0.0, 1.0, 0.0, 0.05)
+    with st.expander("Tune your recommendations"):
+        preference_columns = st.columns(2)
+        with preference_columns[0]:
+            min_energy = st.slider("Minimum energy", 0.0, 1.0, 0.0, 0.05)
+        with preference_columns[1]:
+            min_danceability = st.slider("Minimum danceability", 0.0, 1.0, 0.0, 0.05)
+
+    generate = st.form_submit_button("Generate my queue", use_container_width=True)
 
 selected_mood = user_input.strip()
-generate = st.button("Generate my queue", use_container_width=True)
 refresh = st.button("↻  Refresh picks", use_container_width=True)
 
 if generate:
