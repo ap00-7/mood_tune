@@ -320,18 +320,42 @@ with st.expander("Tune your recommendations"):
     with preference_columns[1]:
         min_danceability = st.slider("Minimum danceability", 0.0, 1.0, 0.0, 0.05)
 
-active_mood = presets[selected_preset]
-if active_mood is None and user_input:
-    active_mood = detect_mood_from_text(user_input)
-
+selected_mood = presets[selected_preset] or user_input.strip()
+generate = st.button("Generate my queue", use_container_width=True)
 refresh = st.button("↻  Refresh picks", use_container_width=True)
-if refresh and active_mood:
-    st.session_state.pop("queue_signature", None)
 
-if active_mood:
+if generate:
+    if not selected_mood:
+        st.warning("Choose a preset or describe your mood first.")
+    else:
+        active_mood = presets[selected_preset]
+        if active_mood is None:
+            active_mood = detect_mood_from_text(selected_mood)
+        st.session_state.generation_id = st.session_state.get("generation_id", 0) + 1
+        st.session_state.generated_request = {
+            "mood": active_mood,
+            "language": selected_language,
+            "count": result_count,
+            "min_energy": min_energy,
+            "min_danceability": min_danceability,
+        }
+
+if refresh:
+    if "generated_request" not in st.session_state:
+        st.warning("Generate a queue first, then refresh the picks.")
+    else:
+        st.session_state.generation_id = st.session_state.get("generation_id", 0) + 1
+
+if "generated_request" in st.session_state:
+    request = st.session_state.generated_request
+    active_mood = request["mood"]
+    selected_language = request["language"]
+    result_count = request["count"]
+    min_energy = request["min_energy"]
+    min_danceability = request["min_danceability"]
     st.success(f"Mood match: **{active_mood.capitalize()}**")
 
-    queue_signature = (active_mood, selected_language, result_count, min_energy, min_danceability)
+    queue_signature = (active_mood, selected_language, result_count, min_energy, min_danceability, st.session_state.generation_id)
     if st.session_state.get("queue_signature") != queue_signature:
         st.session_state.songs = recommend_songs(
             df, active_mood, selected_language, result_count, min_energy, min_danceability
