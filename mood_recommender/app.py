@@ -1,6 +1,5 @@
 import pandas as pd
 import streamlit as st
-from transformers import pipeline
 from PIL import Image
 import base64
 from io import BytesIO
@@ -13,6 +12,8 @@ st.set_page_config(page_title="MoodTune", page_icon="🎧", layout="wide")
 
 @st.cache_resource
 def load_emotion_classifier():
+    from transformers import pipeline
+
     return pipeline(
         "text-classification",
         model="j-hartmann/emotion-english-distilroberta-base",
@@ -183,8 +184,10 @@ def get_mood(valence, energy):
 def detect_mood_from_text(text):
     try:
         cleaned_text = " ".join(text.split())
-        result = load_emotion_classifier()(cleaned_text, truncation=True, max_length=512)
-        emotion = result[0]['label'].lower()
+        predictions = load_emotion_classifier()(cleaned_text, truncation=True, max_length=512)
+        if predictions and isinstance(predictions[0], list):
+            predictions = predictions[0]
+        emotion = predictions[0]['label'].lower()
         st.info(f"🎭 Detected Emotion: **{emotion.capitalize()}**")
         return emotion_to_mood.get(emotion, "chill")
     except Exception as e:
