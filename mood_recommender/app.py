@@ -160,7 +160,7 @@ def detect_mood_from_text(text):
         st.error(f"Failed to detect mood: {e}")
         return "chill"
 
-def recommend_songs(df, mood, language="All", n=5):
+def recommend_songs(df, mood, language="All", n=5, min_energy=0.0, min_danceability=0.0):
     # Filter by mood first
     mood_df = df[df['mood'] == mood]
 
@@ -168,12 +168,21 @@ def recommend_songs(df, mood, language="All", n=5):
     if language != "All":
         mood_df = mood_df[mood_df['language'].str.lower() == language.lower()]
 
+    mood_df = mood_df[
+        (mood_df['energy'] >= min_energy)
+        & (mood_df['danceability'] >= min_danceability)
+    ]
+
     # If fewer songs available than requested, adjust n
     if len(mood_df) < n:
         n = len(mood_df)
 
     # Return random sample
     return mood_df[['track_name', 'artist_name', 'valence', 'energy', 'artwork_url', 'track_url']].sample(n)
+
+
+def playlist_csv(songs):
+    return songs[['track_name', 'artist_name', 'track_url']].to_csv(index=False)
 
 
 def image_to_base64(image_path):
@@ -247,24 +256,59 @@ st.markdown(f"""
 """, unsafe_allow_html=True)
 
 languages = ["All", "English", "Hindi", "Tamil", "Telugu", "Malayalam", "Korean"]
-controls = st.columns([2.4, 1.25, 1.1], gap="large")
+presets = {
+    "Describe my mood": None,
+    "Deep focus": "chill",
+    "Workout boost": "energetic",
+    "Bright morning": "happy",
+    "Late-night unwind": "sad",
+}
+if "history" not in st.session_state:
+    st.session_state.history = []
+if "liked_songs" not in st.session_state:
+    st.session_state.liked_songs = []
+if "feedback" not in st.session_state:
+    st.session_state.feedback = {}
+
+controls = st.columns([1.45, 2.15, 1.25, 1.1], gap="large")
 with controls[0]:
-    user_input = st.text_input("What is the mood?", placeholder="e.g. I feel super relaxed today", label_visibility="visible")
+    selected_preset = st.selectbox("Preset", options=list(presets))
 with controls[1]:
-    selected_language = st.selectbox("Language", options=languages)
+    user_input = st.text_input("What is the mood?", placeholder="e.g. I feel super relaxed today", label_visibility="visible")
 with controls[2]:
+    selected_language = st.selectbox("Language", options=languages)
+with controls[3]:
     result_count = st.slider("Picks", min_value=3, max_value=10, value=5)
 
-refresh = st.button("↻  Refresh picks", use_container_width=True)
-if refresh and user_input:
-    st.rerun()
+with st.expander("Tune your recommendations"):
+    preference_columns = st.columns(2)
+    with preference_columns[0]:
+        min_energy = st.slider("Minimum energy", 0.0, 1.0, 0.0, 0.05)
+    with preference_columns[1]:
+        min_danceability = st.slider("Minimum danceability", 0.0, 1.0, 0.0, 0.05)
 
-if user_input:
-    detected_mood = detect_mood_from_text(user_input)
-    st.success(f"Mood match: **{detected_mood.capitalize()}**")
+active_mood = presets[selected_preset]
+if active_mood is None and user_input:
+    active_mood = detect_mood_from_text(user_input)
+
+refresh = st.button("↻  Refresh picks", use_container_width=True)
+if refresh and active_mood:
+    st.session_state.pop("queue_signature", None)
+
+if active_mood:
+    st.success(f"Mood match: **{active_mood.capitalize()}**")
 
     df = load_data()
-    songs = recommend_songs(df, detected_mood, selected_language, result_count)
+    queue_signature = (active_mood, selected_language, result_count, min_energy, min_danceability)
+    if st.session_state.get("queue_signature") != queue_signature:
+        st.session_state.songs = recommend_songs(
+            df, active_mood, selected_language, result_count, min_energy, min_danceability
+        )
+        st.session_state.queue_signature = queue_signature
+    songs = st.session_state.songs
+    history_item = {"mood": active_mood, "language": selected_language, "count": len(songs)}
+    if not st.session_state.history or st.session_state.history[-1] != history_item:
+        st.session_state.history.append(history_item)
 
     st.markdown(f"<div class=\"section-heading\"><h2>Your listening queue</h2><span>{len(songs)} picks · {selected_language}</span></div>", unsafe_allow_html=True)
     if len(songs) == 0:
@@ -286,3 +330,41 @@ if user_input:
                 </div>
             </div>
             """, unsafe_allow_html=True)
+            feedback_columns = st.columns([1, 1, 8])
+            with feedback_columns[0]:
+                if st.button("Like", key=f"like_{index}"):
+                    song = {"track_name": row["track_name"], "artist_name": row["artist_name"], "track_url": row["track_url"]}
+                    if song not in st.session_state.liked_songs:
+                        st.session_state.liked_songs.append(song)
+                    st.session_state.feedback[index] = "Liked"
+            with feedback_columns[1]:
+                if st.button("Skip", key=f"skip_{index}"):
+                    st.session_state.feedback[index] = "Skipped"
+            if index in st.session_state.feedback:
+                st.caption(f"Feedback saved: {st.session_state.feedback[index]}")
+
+    st.download_button(
+        "Download playlist CSV",
+        data=playlist_csv(songs),
+        file_name=f"moodtune_{active_mood}.csv",
+        mime="text/csv",
+        use_container_width=True,
+    )
+
+with st.expander("Your session history"):
+    if st.session_state.history:
+        st.dataframe(pd.DataFrame(st.session_state.history), use_container_width=True, hide_index=True)
+    else:
+        st.caption("Your recommendations will appear here as you explore.")
+
+if st.session_state.liked_songs:
+    with st.expander(f"Liked songs ({len(st.session_state.liked_songs)})"):
+        liked_df = pd.DataFrame(st.session_state.liked_songs)
+        st.dataframe(liked_df, use_container_width=True, hide_index=True)
+        st.download_button(
+            "Download liked songs",
+            data=liked_df.to_csv(index=False),
+            file_name="moodtune_liked_songs.csv",
+            mime="text/csv",
+            use_container_width=True,
+        )
