@@ -16,10 +16,8 @@ def load_emotion_classifier():
     return pipeline(
         "text-classification",
         model="j-hartmann/emotion-english-distilroberta-base",
-        return_all_scores=False
+        top_k=1
     )
-
-emotion_classifier = load_emotion_classifier()
 
 emotion_to_mood = {
     "admiration": "happy",
@@ -184,7 +182,8 @@ def get_mood(valence, energy):
 
 def detect_mood_from_text(text):
     try:
-        result = emotion_classifier(text)
+        cleaned_text = " ".join(text.split())
+        result = load_emotion_classifier()(cleaned_text, truncation=True, max_length=512)
         emotion = result[0]['label'].lower()
         st.info(f"🎭 Detected Emotion: **{emotion.capitalize()}**")
         return emotion_to_mood.get(emotion, "chill")
@@ -287,15 +286,11 @@ st.markdown(f"""
     </div>
 """, unsafe_allow_html=True)
 
-df = load_data()
-languages = ["All"] + sorted(df["language"].dropna().unique().tolist())
-presets = {
-    "Describe my mood": None,
-    "Deep focus": "chill",
-    "Workout boost": "energetic",
-    "Bright morning": "happy",
-    "Late-night unwind": "sad",
-}
+languages = [
+    "All", "Assamese", "Bengali", "Bhojpuri", "English", "Global",
+    "Gujarati", "Haryanvi", "Hindi", "Kannada", "Korean", "Malayalam",
+    "Marathi", "Odia", "Punjabi", "Rajasthani", "Tamil", "Telugu", "Urdu",
+]
 if "history" not in st.session_state:
     st.session_state.history = []
 if "liked_songs" not in st.session_state:
@@ -303,14 +298,12 @@ if "liked_songs" not in st.session_state:
 if "feedback" not in st.session_state:
     st.session_state.feedback = {}
 
-controls = st.columns([1.45, 2.15, 1.25, 1.1], gap="large")
+controls = st.columns([2.7, 1.25, 1.1], gap="large")
 with controls[0]:
-    selected_preset = st.selectbox("Preset", options=list(presets))
-with controls[1]:
     user_input = st.text_input("What is the mood?", placeholder="e.g. I feel super relaxed today", label_visibility="visible")
-with controls[2]:
+with controls[1]:
     selected_language = st.selectbox("Language", options=languages)
-with controls[3]:
+with controls[2]:
     result_count = st.slider("Picks", min_value=3, max_value=10, value=5)
 
 with st.expander("Tune your recommendations"):
@@ -320,17 +313,15 @@ with st.expander("Tune your recommendations"):
     with preference_columns[1]:
         min_danceability = st.slider("Minimum danceability", 0.0, 1.0, 0.0, 0.05)
 
-selected_mood = presets[selected_preset] or user_input.strip()
+selected_mood = user_input.strip()
 generate = st.button("Generate my queue", use_container_width=True)
 refresh = st.button("↻  Refresh picks", use_container_width=True)
 
 if generate:
     if not selected_mood:
-        st.warning("Choose a preset or describe your mood first.")
+        st.warning("Describe your mood first.")
     else:
-        active_mood = presets[selected_preset]
-        if active_mood is None:
-            active_mood = detect_mood_from_text(selected_mood)
+        active_mood = detect_mood_from_text(selected_mood)
         st.session_state.generation_id = st.session_state.get("generation_id", 0) + 1
         st.session_state.generated_request = {
             "mood": active_mood,
@@ -347,6 +338,7 @@ if refresh:
         st.session_state.generation_id = st.session_state.get("generation_id", 0) + 1
 
 if "generated_request" in st.session_state:
+    df = load_data()
     request = st.session_state.generated_request
     active_mood = request["mood"]
     selected_language = request["language"]
