@@ -150,12 +150,8 @@ def load_data():
         if "language" not in source_df:
             source_df["language"] = "Global" if source_name == "dataset" else source_name
         if "track_url" not in source_df:
-            source_df["track_url"] = source_df.apply(
-                lambda row: "https://open.spotify.com/search/" + quote_plus(
-                    f"{row.get('track_name', '')} {row.get('artist_name', '')}"
-                ),
-                axis=1,
-            )
+            search_terms = source_df["track_name"].fillna("").astype(str) + " " + source_df["artist_name"].fillna("").astype(str)
+            source_df["track_url"] = "https://open.spotify.com/search/" + search_terms.map(quote_plus)
         if "artwork_url" not in source_df:
             source_df["artwork_url"] = "https://placehold.co/300x300/F4F1EA/17221F?text=MoodTune"
         frames.append(source_df)
@@ -168,7 +164,13 @@ def load_data():
     df = df.dropna(subset=["valence", "energy", "danceability"])
     df["language"] = df["language"].astype(str).str.strip()
     df = df.drop_duplicates(subset=["track_name", "artist_name", "language"])
-    df['mood'] = df.apply(lambda row: get_mood(row['valence'], row['energy']), axis=1)
+    df["mood"] = "chill"
+    happy_mask = (df["valence"] > 0.6) & (df["energy"] > 0.6)
+    sad_mask = (df["valence"] < 0.4) & (df["energy"] < 0.5)
+    energetic_mask = (df["energy"] > 0.7) & (df["valence"] < 0.6)
+    df.loc[happy_mask, "mood"] = "happy"
+    df.loc[sad_mask, "mood"] = "sad"
+    df.loc[energetic_mask, "mood"] = "energetic"
     return df
 
 def get_mood(valence, energy):
@@ -334,9 +336,9 @@ with st.expander("Tune your recommendations"):
 selected_mood = user_input.strip()
 refresh = st.button("↻  Refresh picks", use_container_width=True)
 
-if selected_mood:
+if selected_mood and selected_mood != st.session_state.get("last_mood_input"):
     active_mood = detect_mood_from_text(selected_mood)
-    st.session_state.generation_id = st.session_state.get("generation_id", 0) + 1
+    st.session_state.last_mood_input = selected_mood
     st.session_state.generated_request = {
         "mood": active_mood,
         "language": selected_language,
@@ -344,12 +346,19 @@ if selected_mood:
         "min_energy": min_energy,
         "min_danceability": min_danceability,
     }
+elif selected_mood and "generated_request" in st.session_state:
+    st.session_state.generated_request.update({
+        "language": selected_language,
+        "count": result_count,
+        "min_energy": min_energy,
+        "min_danceability": min_danceability,
+    })
 
 if refresh:
     if "generated_request" not in st.session_state:
         st.warning("Generate a queue first, then refresh the picks.")
     else:
-        st.session_state.generation_id = st.session_state.get("generation_id", 0) + 1
+        st.session_state.refresh_id = st.session_state.get("refresh_id", 0) + 1
 
 if "generated_request" in st.session_state:
     df = load_data()
@@ -361,7 +370,8 @@ if "generated_request" in st.session_state:
     min_danceability = request["min_danceability"]
     st.success(f"Mood match: **{active_mood.capitalize()}**")
 
-    queue_signature = (active_mood, selected_language, result_count, min_energy, min_danceability, st.session_state.generation_id)
+    request_signature = (active_mood, selected_language, result_count, min_energy, min_danceability)
+    queue_signature = request_signature + (st.session_state.get("refresh_id", 0),)
     if st.session_state.get("queue_signature") != queue_signature:
         st.session_state.songs = recommend_songs(
             df, active_mood, selected_language, result_count, min_energy, min_danceability
