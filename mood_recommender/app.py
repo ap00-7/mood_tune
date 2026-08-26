@@ -254,15 +254,25 @@ def image_to_base64(image_path):
 
 image_path = os.path.join(os.path.dirname(__file__), "logo.png")
 img_base64 = image_to_base64(image_path)
+if "dark_mode" not in st.session_state:
+    st.session_state.dark_mode = False
+theme_spacer, theme_control = st.columns([8, 2])
+with theme_control:
+    dark_mode = st.toggle("Dark mode", key="dark_mode")
+
+if dark_mode:
+    ink, muted, paper, surface, line = "#f4f1ea", "#aab5ae", "#111715", "#1b2420", "#35423c"
+else:
+    ink, muted, paper, surface, line = "#17221f", "#6d7771", "#f4f1ea", "#fffdf8", "#ddd8ce"
 
 st.markdown(f"""
     <style>
     :root {{
-        --ink: #17221f;
-        --muted: #6d7771;
-        --paper: #f4f1ea;
-        --surface: #fffdf8;
-        --line: #ddd8ce;
+        --ink: {ink};
+        --muted: {muted};
+        --paper: {paper};
+        --surface: {surface};
+        --line: {line};
         --lime: #c9f15b;
         --coral: #ff6b4a;
         --green: #1f9d61;
@@ -272,6 +282,7 @@ st.markdown(f"""
         color: var(--ink);
     }}
     [data-testid="stHeader"] {{ background: transparent; }}
+    [data-testid="stAppViewContainer"] {{ background: transparent; }}
     [data-testid="stAppViewContainer"] > .main {{ padding-top: 2rem; }}
     .block-container {{ max-width: 1120px; padding-bottom: 4rem; }}
     .brand-row {{ align-items: center; border-bottom: 1px solid rgba(23,34,31,.16); display: flex; justify-content: space-between; margin-bottom: 3.5rem; padding-bottom: 1rem; }}
@@ -279,15 +290,17 @@ st.markdown(f"""
     .brand-mark {{ width: 54px; height: 54px; border-radius: 16px; object-fit: cover; box-shadow: 7px 7px 0 var(--coral); }}
     .brand-name {{ color: var(--ink); font-size: 1.1rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; }}
     .brand-status {{ color: var(--muted); font-size: .75rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }}
-    .hero {{ align-items: end; display: flex; justify-content: space-between; margin-bottom: 2.8rem; max-width: 980px; animation: rise 0.6s ease-out; }}
+    .hero {{ align-items: end; display: flex; gap: 48px; justify-content: space-between; margin-bottom: 2.8rem; max-width: 980px; animation: rise 0.6s ease-out; }}
+    .hero-copy {{ flex: 1; min-width: 0; }}
     .kicker {{ color: var(--coral); font-size: 0.78rem; font-weight: 800; letter-spacing: 0.14em; text-transform: uppercase; margin-bottom: 0.75rem; }}
-    .hero h1 {{ color: var(--ink); font-size: clamp(2.8rem, 7vw, 5.8rem); line-height: 0.94; letter-spacing: -0.04em; margin: 0; }}
+    .hero h1 {{ color: var(--ink); font-size: 5rem; line-height: 0.94; letter-spacing: -0.04em; margin: 0; }}
     .hero p {{ color: var(--muted); font-size: 1.1rem; line-height: 1.55; max-width: 540px; margin-top: 1.2rem; }}
     .hero-note {{ background: var(--ink); border-radius: 14px; color: white; font-size: .82rem; line-height: 1.5; margin-bottom: .4rem; max-width: 180px; padding: 18px; transform: rotate(2deg); }}
     .hero-note strong {{ color: var(--lime); display: block; font-size: 1.4rem; margin-bottom: 3px; }}
-    .control-zone {{ background: rgba(255,253,248,.64); border: 1px solid rgba(23,34,31,.1); border-radius: 18px; box-shadow: 0 18px 55px rgba(23,34,31,.07); padding: 22px 24px 8px; }}
+    .control-zone {{ background: var(--surface); }}
     .control-label {{ color: var(--ink); font-size: 0.8rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; margin: 0 0 0.5rem; }}
     .stTextInput label, .stSelectbox label, .stSlider label {{ color: var(--ink) !important; }}
+    [data-testid="stToggle"] label, [data-testid="stToggle"] p {{ color: var(--ink) !important; }}
     .stTextInput input, .stSelectbox [data-baseweb="select"] > div {{ background: var(--surface); border: 1px solid var(--line); color: var(--ink); border-radius: 10px; }}
     .stTextInput input:focus {{ border-color: var(--green); box-shadow: 0 0 0 2px rgba(31, 157, 97, 0.14); }}
     .stSlider [data-baseweb="slider"] div[role="slider"] {{ background: var(--green); }}
@@ -317,9 +330,11 @@ st.markdown(f"""
         <span class="brand-status">Personal audio intelligence · Online</span>
     </div>
     <div class="hero">
-        <div class="kicker">Soundtrack your state of mind</div>
-        <h1>Find the sound<br />that fits today.</h1>
-        <p>Describe the moment. MoodTune reads the feeling and builds a short, personal listening queue.</p>
+        <div class="hero-copy">
+            <div class="kicker">Soundtrack your state of mind</div>
+            <h1>Find the sound<br />that fits today.</h1>
+            <p>Describe the moment. MoodTune reads the feeling and builds a short, personal listening queue.</p>
+        </div>
         <div class="hero-note"><strong>01</strong>Tell us what the moment feels like. We will find the frequency.</div>
     </div>
 """, unsafe_allow_html=True)
@@ -336,7 +351,7 @@ if "liked_songs" not in st.session_state:
 if "feedback" not in st.session_state:
     st.session_state.feedback = {}
 
-with st.container(border=True):
+with st.container():
     controls = st.columns([2.7, 1.25, 1.1], gap="large")
     with controls[0]:
         user_input = st.text_input("What is the mood?", placeholder="e.g. I feel super relaxed today", label_visibility="visible")
