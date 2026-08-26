@@ -299,11 +299,23 @@ st.markdown(f"""
     .hero-note strong {{ color: var(--lime); display: block; font-size: 1.4rem; margin-bottom: 3px; }}
     .control-zone {{ background: var(--surface); }}
     .control-label {{ color: var(--ink); font-size: 0.8rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; margin: 0 0 0.5rem; }}
-    .stTextInput label, .stSelectbox label, .stSlider label {{ color: var(--ink) !important; }}
-    [data-testid="stToggle"] label, [data-testid="stToggle"] p {{ color: var(--ink) !important; }}
-    .stTextInput input, .stSelectbox [data-baseweb="select"] > div {{ background: var(--surface); border: 1px solid var(--line); color: var(--ink); border-radius: 10px; }}
-    .stTextInput input:focus {{ border-color: var(--green); box-shadow: 0 0 0 2px rgba(31, 157, 97, 0.14); }}
-    .stSlider [data-baseweb="slider"] div[role="slider"] {{ background: var(--green); }}
+    .stTextInput label, .stSelectbox label, .stSlider label {{ color: var(--ink) !important; font-size: .74rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }}
+    [data-testid="stCheckbox"] label, [data-testid="stCheckbox"] p {{ color: var(--ink) !important; font-size: .74rem; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; }}
+    .stTextInput input {{ background: var(--surface); border: 1px solid var(--line); border-radius: 14px; box-shadow: inset 0 1px 0 rgba(255,255,255,.5), 0 8px 20px rgba(23,34,31,.04); color: var(--ink); font-size: 1rem; min-height: 48px; padding: 0 16px; transition: border-color .2s ease, box-shadow .2s ease, transform .2s ease; }}
+    .stTextInput input:hover {{ border-color: var(--green); }}
+    .stTextInput input:focus {{ border-color: var(--green); box-shadow: 0 0 0 4px rgba(31, 157, 97, 0.13), 0 8px 20px rgba(23,34,31,.06); transform: translateY(-1px); }}
+    .stSelectbox [data-baseweb="select"] > div {{ background: var(--surface); border: 1px solid var(--line); border-radius: 14px; box-shadow: 0 8px 20px rgba(23,34,31,.04); color: var(--ink); min-height: 48px; transition: border-color .2s ease, box-shadow .2s ease; }}
+    .stSelectbox [data-baseweb="select"] > div:hover {{ border-color: var(--green); box-shadow: 0 0 0 3px rgba(31,157,97,.1); }}
+    .stSelectbox [data-baseweb="select"] span, .stSelectbox [data-baseweb="select"] div {{ color: var(--ink) !important; }}
+    .stSlider [data-baseweb="slider"] {{ padding-top: 12px; }}
+    .stSlider [data-baseweb="slider"] div[role="slider"] {{ background: var(--green); border: 3px solid var(--surface); box-shadow: 0 2px 8px rgba(31,157,97,.35); height: 20px; width: 20px; }}
+    .stSlider [data-baseweb="slider"] div[role="progressbar"] {{ background: linear-gradient(90deg, var(--coral), var(--green)); height: 5px; }}
+    .stSlider [data-baseweb="slider"] > div > div {{ background: var(--line); height: 5px; }}
+    [data-testid="stCheckbox"] {{ background: var(--surface); border: 1px solid var(--line); border-radius: 999px; box-shadow: 0 6px 16px rgba(23,34,31,.06); padding: 5px 12px 5px 7px; }}
+    [data-testid="stCheckbox"] label[data-baseweb="checkbox"] > div:first-child {{ align-items: center; background: var(--line); border-radius: 999px; display: flex; height: 20px; justify-content: flex-start; padding: 2px; width: 36px; }}
+    [data-testid="stCheckbox"] label[data-baseweb="checkbox"] > div:first-child > div {{ background: var(--muted); border-radius: 50%; height: 16px; transition: transform .2s ease, background .2s ease; width: 16px; }}
+    [data-testid="stCheckbox"] label[data-baseweb="checkbox"]:has(input:checked) > div:first-child {{ background: var(--green); }}
+    [data-testid="stCheckbox"] label[data-baseweb="checkbox"]:has(input:checked) > div:first-child > div {{ background: var(--lime); transform: translateX(16px); }}
     .stButton button {{ background: var(--ink); border: 0; border-radius: 10px; color: white; font-weight: 700; min-height: 42px; width: 100%; }}
     .stButton button:hover {{ background: var(--green); color: white; }}
     .stAlert {{ border-radius: 10px; border: 1px solid var(--line); }}
