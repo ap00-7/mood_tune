@@ -6,9 +6,18 @@ from io import BytesIO
 import html
 import os
 from glob import glob
-from urllib.parse import quote_plus
+from urllib.parse import quote, quote_plus
 
 st.set_page_config(page_title="MoodTune", page_icon="🎧", layout="wide")
+
+DEFAULT_ARTWORK = "data:image/svg+xml;utf8," + quote(
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 600">'
+    '<rect width="600" height="600" fill="#17221f"/>'
+    '<circle cx="300" cy="300" r="170" fill="#c9f15b"/>'
+    '<path d="M255 215v170l145-85z" fill="#17221f"/>'
+    '<circle cx="300" cy="300" r="215" fill="none" stroke="#ff6b4a" stroke-width="10" opacity=".8"/>'
+    '</svg>'
+)
 
 @st.cache_resource
 def load_emotion_classifier():
@@ -153,7 +162,7 @@ def load_data():
             search_terms = source_df["track_name"].fillna("").astype(str) + " " + source_df["artist_name"].fillna("").astype(str)
             source_df["track_url"] = "https://open.spotify.com/search/" + search_terms.map(quote_plus)
         if "artwork_url" not in source_df:
-            source_df["artwork_url"] = "https://placehold.co/300x300/F4F1EA/17221F?text=MoodTune"
+            source_df["artwork_url"] = DEFAULT_ARTWORK
         frames.append(source_df)
 
     df = pd.concat(frames, ignore_index=True, sort=False)
@@ -259,19 +268,24 @@ st.markdown(f"""
         --green: #1f9d61;
     }}
     .stApp {{
-        background: radial-gradient(circle at 90% 0%, #e8f3cc 0, transparent 28%), var(--paper);
+        background: radial-gradient(circle at 88% 0%, #dcecae 0, transparent 25%), radial-gradient(circle at 5% 45%, #f8d9ca 0, transparent 22%), var(--paper);
         color: var(--ink);
     }}
     [data-testid="stHeader"] {{ background: transparent; }}
     [data-testid="stAppViewContainer"] > .main {{ padding-top: 2rem; }}
     .block-container {{ max-width: 1120px; padding-bottom: 4rem; }}
-    .brand-row {{ display: flex; align-items: center; gap: 14px; margin-bottom: 3rem; }}
+    .brand-row {{ align-items: center; border-bottom: 1px solid rgba(23,34,31,.16); display: flex; justify-content: space-between; margin-bottom: 3.5rem; padding-bottom: 1rem; }}
+    .brand-left {{ align-items: center; display: flex; gap: 14px; }}
     .brand-mark {{ width: 54px; height: 54px; border-radius: 16px; object-fit: cover; box-shadow: 7px 7px 0 var(--coral); }}
     .brand-name {{ color: var(--ink); font-size: 1.1rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; }}
-    .hero {{ max-width: 760px; margin-bottom: 2.4rem; animation: rise 0.6s ease-out; }}
+    .brand-status {{ color: var(--muted); font-size: .75rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }}
+    .hero {{ align-items: end; display: flex; justify-content: space-between; margin-bottom: 2.8rem; max-width: 980px; animation: rise 0.6s ease-out; }}
     .kicker {{ color: var(--coral); font-size: 0.78rem; font-weight: 800; letter-spacing: 0.14em; text-transform: uppercase; margin-bottom: 0.75rem; }}
     .hero h1 {{ color: var(--ink); font-size: clamp(2.8rem, 7vw, 5.8rem); line-height: 0.94; letter-spacing: -0.04em; margin: 0; }}
     .hero p {{ color: var(--muted); font-size: 1.1rem; line-height: 1.55; max-width: 540px; margin-top: 1.2rem; }}
+    .hero-note {{ background: var(--ink); border-radius: 14px; color: white; font-size: .82rem; line-height: 1.5; margin-bottom: .4rem; max-width: 180px; padding: 18px; transform: rotate(2deg); }}
+    .hero-note strong {{ color: var(--lime); display: block; font-size: 1.4rem; margin-bottom: 3px; }}
+    .control-zone {{ background: rgba(255,253,248,.64); border: 1px solid rgba(23,34,31,.1); border-radius: 18px; box-shadow: 0 18px 55px rgba(23,34,31,.07); padding: 22px 24px 8px; }}
     .control-label {{ color: var(--ink); font-size: 0.8rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; margin: 0 0 0.5rem; }}
     .stTextInput label, .stSelectbox label, .stSlider label {{ color: var(--ink) !important; }}
     .stTextInput input, .stSelectbox [data-baseweb="select"] > div {{ background: var(--surface); border: 1px solid var(--line); color: var(--ink); border-radius: 10px; }}
@@ -293,16 +307,20 @@ st.markdown(f"""
     .spotify-button {{ background: var(--lime); border-radius: 8px; color: var(--ink); display: inline-block; font-size: 0.8rem; font-weight: 800; margin-top: 10px; padding: 7px 11px; text-decoration: none; }}
     .spotify-button:hover {{ color: var(--ink); background: #b7e53e; }}
     @keyframes rise {{ from {{ opacity: 0; transform: translateY(12px); }} to {{ opacity: 1; transform: translateY(0); }} }}
-    @media (max-width: 640px) {{ .brand-row {{ margin-bottom: 2rem; }} .hero h1 {{ font-size: 3.2rem; }} .song-card {{ align-items: flex-start; }} .song-art {{ width: 72px; }} .section-heading {{ display: block; }} }}
+    @media (max-width: 640px) {{ .brand-row {{ margin-bottom: 2rem; }} .brand-status, .hero-note {{ display: none; }} .hero {{ display: block; }} .hero h1 {{ font-size: 3.2rem; }} .control-zone {{ padding: 16px 14px 4px; }} .song-card {{ align-items: flex-start; }} .song-art {{ width: 72px; }} .section-heading {{ display: block; }} }}
     </style>
     <div class="brand-row">
-        <img src="data:image/png;base64,{img_base64}" class="brand-mark" alt="MoodTune logo" />
-        <span class="brand-name">MoodTune</span>
+        <div class="brand-left">
+            <img src="data:image/png;base64,{img_base64}" class="brand-mark" alt="MoodTune logo" />
+            <span class="brand-name">MoodTune</span>
+        </div>
+        <span class="brand-status">Personal audio intelligence · Online</span>
     </div>
     <div class="hero">
         <div class="kicker">Soundtrack your state of mind</div>
         <h1>Find the sound<br />that fits today.</h1>
         <p>Describe the moment. MoodTune reads the feeling and builds a short, personal listening queue.</p>
+        <div class="hero-note"><strong>01</strong>Tell us what the moment feels like. We will find the frequency.</div>
     </div>
 """, unsafe_allow_html=True)
 
@@ -318,20 +336,21 @@ if "liked_songs" not in st.session_state:
 if "feedback" not in st.session_state:
     st.session_state.feedback = {}
 
-controls = st.columns([2.7, 1.25, 1.1], gap="large")
-with controls[0]:
-    user_input = st.text_input("What is the mood?", placeholder="e.g. I feel super relaxed today", label_visibility="visible")
-with controls[1]:
-    selected_language = st.selectbox("Language", options=languages)
-with controls[2]:
-    result_count = st.slider("Picks", min_value=3, max_value=10, value=5)
+with st.container(border=True):
+    controls = st.columns([2.7, 1.25, 1.1], gap="large")
+    with controls[0]:
+        user_input = st.text_input("What is the mood?", placeholder="e.g. I feel super relaxed today", label_visibility="visible")
+    with controls[1]:
+        selected_language = st.selectbox("Language", options=languages)
+    with controls[2]:
+        result_count = st.slider("Picks", min_value=3, max_value=10, value=5)
 
-with st.expander("Tune your recommendations"):
-    preference_columns = st.columns(2)
-    with preference_columns[0]:
-        min_energy = st.slider("Minimum energy", 0.0, 1.0, 0.0, 0.05)
-    with preference_columns[1]:
-        min_danceability = st.slider("Minimum danceability", 0.0, 1.0, 0.0, 0.05)
+    with st.expander("Tune your recommendations"):
+        preference_columns = st.columns(2)
+        with preference_columns[0]:
+            min_energy = st.slider("Minimum energy", 0.0, 1.0, 0.0, 0.05)
+        with preference_columns[1]:
+            min_danceability = st.slider("Minimum danceability", 0.0, 1.0, 0.0, 0.05)
 
 selected_mood = user_input.strip()
 refresh = st.button("↻  Refresh picks", use_container_width=True)
