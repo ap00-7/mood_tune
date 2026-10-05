@@ -5,9 +5,11 @@ Small FastAPI service that runs the original Hugging Face emotion classifier and
 ## Model and inference
 
 - Model: `j-hartmann/emotion-english-distilroberta-base`
-- Inference: `transformers.pipeline("text-classification", model=MODEL_ID, top_k=1)`
+- Inference: `transformers.pipeline("text-classification", model=MODEL_ID, top_k=None)`
 - The model is loaded once during FastAPI application startup.
-- The model's top emotion label and its returned score are used directly. Unknown labels retain the original app's `"chill"` fallback.
+- The loaded model's `id2label` config is validated and its complete returned probability distribution is sorted high-to-low. The primary emotion is the top label and confidence is its exact model score.
+- Model probabilities are not a measure of emotional accuracy. The mood affinity distribution sums model scores by the original mapping and normalizes those totals; unknown labels retain the original app's `"chill"` fallback.
+- Listening intent is a separate optional input, never inferred from text. The current allowed values are `match_mood`, `lift_me_up`, `calm_me_down`, and `add_energy`.
 - The complete emotion-to-mood mapping is retained from `mood_recommender/app.py`.
 
 ## Local setup
@@ -48,7 +50,7 @@ Returns service health and whether the model loaded. It does not run inference:
 Accepts one non-empty text string, normalized for repeated whitespace, up to 2,000 characters:
 
 ```json
-{"text":"I feel amazing today"}
+{"text":"I feel amazing today","intent":"lift_me_up"}
 ```
 
 Returns model-derived output:
@@ -56,9 +58,20 @@ Returns model-derived output:
 ```json
 {
   "emotion": "joy",
+  "emotion_scores": [
+    {"emotion": "joy", "score": 0.72},
+    {"emotion": "neutral", "score": 0.08},
+    {"emotion": "sadness", "score": 0.06},
+    {"emotion": "anger", "score": 0.05},
+    {"emotion": "fear", "score": 0.04},
+    {"emotion": "surprise", "score": 0.04},
+    {"emotion": "disgust", "score": 0.01}
+  ],
   "mood": "happy",
-  "confidence": 0.94,
-  "model": "j-hartmann/emotion-english-distilroberta-base"
+  "mood_affinities": {"happy": 0.72, "sad": 0.10, "energetic": 0.09, "chill": 0.09},
+  "confidence": 0.72,
+  "model": "j-hartmann/emotion-english-distilroberta-base",
+  "intent": "lift_me_up"
 }
 ```
 

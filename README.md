@@ -20,22 +20,35 @@ The browser experience collects a short mood description, presents the model's r
 
 1. The user describes their mood in the Next.js interface.
 2. The Next.js API validates the text and sends it to the Python ML service.
-3. The ML service runs transformer inference and returns its top emotion and actual model score.
-4. The emotion is mapped to happy, sad, energetic, or chill using the original mapping.
-5. Next.js passes that mood to the recommendation engine, which ranks catalog tracks using mood, valence, energy, danceability, and the selected language.
-6. The user can open a recommended track through its Spotify or external link.
+3. The ML service runs transformer inference and returns the complete, sorted emotion distribution and the top model score.
+4. Emotion scores are aggregated through the original mapping into normalized mood affinities; unknown labels retain the `chill` fallback.
+5. The interface presents the detected signal; the user then explicitly selects a listening intent (`match_mood`, `lift_me_up`, `calm_me_down`, or `add_energy`). Intent is not inferred from text or by the model.
+6. Next.js sends the validated emotional context, selected intent, language filter, and device-local preference profile to rank catalog tracks.
+7. Likes, saves, and skips update bounded music preferences in local storage; raw mood text is never stored in that profile or included in the ranking request.
+8. The user can open a recommended track through its Spotify or external link.
 
-Catalog pages browse successive slices of the existing ranked results; the scoring formula is unchanged. Duplicate track/artist/language rows are collapsed, matching the original Streamlit catalog's deduplication behavior.
+Catalog pages browse successive slices of ranked results. Duplicate catalog IDs are collapsed, and artist repetition is capped at two when enough alternatives are available.
+
+## Personalization and Ranking
+
+- The versioned `moodtune.preferences.v1` profile stores capped track feedback IDs, bounded feature preferences, mood-vocabulary preferences, and language preferences in `localStorage`. It contains no raw mood text and is sent only from the browser to the Next.js API for ranking.
+- Like and save are separate positive signals with different update rates. Duplicate actions on the same track do not repeatedly increase preferences. Skips are bounded negative signals, clear positive membership for that track, and exclude it from recommendations on that device.
+- Feature preferences use only catalog values for valence, energy, and danceability. Missing/out-of-range values remain unavailable rather than being fabricated.
+- Available scores are normalized to `[0, 1]`: emotion-context is the affinity for a track's existing feature-derived mood; intent is a weighted inverse distance to the selected audio-feature targets; user preference compares available profile preferences; language preference uses repeated feedback; content normalizes the original content-ranking score; and popularity uses existing 0–100 metadata only.
+- Base component weights are 30% emotion context, 25% intent, 25% user preference, 10% language, 5% original content, and 5% optional popularity. Weights for unavailable components are removed and remaining weights are renormalized. The user-preference weight is multiplied by feedback maturity (`unique feedback tracks / 5`, capped at 1), so a new user starts with emotion, intent, and content rather than requiring history.
+- Explicit language filters stay hard filters and are separate from the English-focused emotion classifier. Intent and preference scores never infer emotion or intent.
+- Each recommendation response includes its component scores and normalized weights for inspection. These preference signals describe music choices only, not psychological profiling.
 
 ## Machine Learning
 
 - Model: `j-hartmann/emotion-english-distilroberta-base`
-- Library: Hugging Face Transformers, with `pipeline("text-classification", ..., top_k=1)`
+- Library: Hugging Face Transformers, with `pipeline("text-classification", ..., top_k=None)`
 - Model instance: loaded once during FastAPI application startup
-- Output: model's top emotion label and its returned confidence score
+- Output: all configured emotion labels and their returned probabilities, sorted high-to-low; confidence equals the top score and is not a claim of emotional accuracy
+- Listening intent: optional, explicit recommendation input with deterministic valence, energy, and danceability targets
 - Mapping: all 110 emotion-to-mood entries are preserved from the original Streamlit app; unlisted labels default to `chill`, matching the original behavior
 
-No keyword-based JavaScript detector or generated confidence score is used for inference.
+No keyword-based JavaScript detector or generated confidence score is used for inference. The recommender is deterministic and content-based; it does not train a model.
 
 ## Tech Stack
 
@@ -64,7 +77,7 @@ The model service is intentionally separate; the transformer and PyTorch runtime
 
 - `/` — product landing page
 - `/discover` — browse catalog recommendations by mood and language
-- `/mood` — analyze a text description with the real transformer model
+- `/mood` — analyze a text description, choose listening intent, and generate personalized recommendations
 - `/recommendations` — explore catalog picks with mood and language filters
 - `/about` — architecture and implementation overview
 

@@ -1,6 +1,6 @@
 'use client';
 
-import { FormEvent, KeyboardEvent, useState } from 'react';
+import { FormEvent, KeyboardEvent, useEffect, useState } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import {
   ArrowDown,
@@ -17,7 +17,22 @@ import {
 } from 'lucide-react';
 
 import { MusicCard, type TrackResult } from '@/components/music-card';
+import {
+  listeningIntentLabels,
+  listeningIntents,
+  type ListeningIntent,
+} from '@/lib/listening-intent';
 import { moodMeta, type Mood } from '@/lib/mood';
+import {
+  createDefaultPreferenceProfile,
+  likeTrack,
+  loadPreferenceProfile,
+  saveTrack,
+  savePreferenceProfile,
+  skipTrack,
+  type PreferenceProfile,
+  type TrackFeedback,
+} from '@/lib/preferences';
 
 const MAX_TEXT_LENGTH = 2000;
 const languageOptions = [
@@ -39,7 +54,7 @@ const languageOptions = [
   'Telugu',
   'Urdu',
 ];
-const analysisStages = ['Understanding your mood…', 'Finding music that fits…', 'Curating your recommendations…'];
+const analysisStages = ['Reading the emotional signal…', 'Checking the model distribution…'];
 const moodIcons: Record<Mood, typeof Sun> = {
   happy: Sun,
   sad: Moon,
@@ -49,17 +64,24 @@ const moodIcons: Record<Mood, typeof Sun> = {
 
 type MoodResponse = {
   emotion: string;
+  emotion_scores: { emotion: string; score: number }[];
   mood: Mood;
+  mood_affinities: Record<Mood, number>;
   label: string;
   explanation: string;
   confidence: number;
-  recommendations: TrackResult[];
+  model: string;
+  intent: ListeningIntent | null;
+  recommendations?: TrackResult[];
 };
 
 export function MoodDiscovery() {
   const [text, setText] = useState('');
   const [language, setLanguage] = useState('All');
+  const [intent, setIntent] = useState<ListeningIntent>('match_mood');
+  const [preferences, setPreferences] = useState<PreferenceProfile>(createDefaultPreferenceProfile);
   const [loading, setLoading] = useState(false);
+  const [recommendationsLoading, setRecommendationsLoading] = useState(false);
   const [stage, setStage] = useState(0);
   const [result, setResult] = useState<MoodResponse | null>(null);
   const [error, setError] = useState('');
@@ -67,6 +89,10 @@ export function MoodDiscovery() {
   const remaining = MAX_TEXT_LENGTH - text.length;
   const visual = result ? moodMeta[result.mood] : null;
   const MoodIcon = result ? moodIcons[result.mood] : Sparkles;
+
+  useEffect(() => {
+    setPreferences(loadPreferenceProfile());
+  }, []);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -77,16 +103,15 @@ export function MoodDiscovery() {
     setStage(0);
     setError('');
     setResult(null);
-    const stageTimers = [
-      window.setTimeout(() => setStage(1), 650),
-      window.setTimeout(() => setStage(2), 1500),
-    ];
+    setRecommendationsLoading(false);
+    setIntent('match_mood');
+    const stageTimer = window.setTimeout(() => setStage(1), 650);
 
     try {
       const response = await fetch('/api/mood', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: normalizedText, language, limit: 8 }),
+        body: JSON.stringify({ text: normalizedText }),
       });
       const payload: unknown = await response.json();
 
@@ -104,7 +129,8 @@ export function MoodDiscovery() {
         !('mood' in payload) ||
         !('emotion' in payload) ||
         !('confidence' in payload) ||
-        !('recommendations' in payload)
+        !('emotion_scores' in payload) ||
+        !('mood_affinities' in payload)
       ) {
         throw new Error('We couldn’t read your mood right now. Please try again in a moment.');
       }
@@ -121,8 +147,89 @@ export function MoodDiscovery() {
           : 'Mood analysis is temporarily unavailable. Please try again in a moment.',
       );
     } finally {
-      stageTimers.forEach(window.clearTimeout);
+      window.clearTimeout(stageTimer);
       setLoading(false);
+    }
+  }
+
+  async function generateRecommendations() {
+    if (!result || recommendationsLoading) return;
+    setRecommendationsLoading(true);
+    setError('');
+    try {
+      const response = await fetch('/api/recommendations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          mood: result.mood,
+          language,
+          limit: 8,
+          offset: 0,
+          intent,
+          prediction: {
+            emotion: result.emotion,
+            emotion_scores: result.emotion_scores,
+            mood: result.mood,
+            mood_affinities: result.mood_affinities,
+            confidence: result.confidence,
+            model: result.model,
+          },
+          preferences,
+        }),
+      });
+      const payload: unknown = await response.json();
+      if (!response.ok) {
+        const message =
+          payload && typeof payload === 'object' && 'error' in payload && typeof payload.error === 'string'
+            ? payload.error
+            : 'Recommendations are temporarily unavailable. Please try again.';
+        throw new Error(message);
+      }
+      if (!payload || typeof payload !== 'object' || !('tracks' in payload) || !Array.isArray(payload.tracks)) {
+        throw new Error('Recommendations returned an unexpected response.');
+      }
+      setResult((current) =>
+        current
+          ? { ...current, intent, recommendations: payload.tracks as TrackResult[] }
+          : current,
+      );
+    } catch (recommendationError) {
+      console.error('Recommendation request failed', recommendationError);
+      setError(
+        recommendationError instanceof Error
+          ? recommendationError.message
+          : 'Recommendations are temporarily unavailable. Please try again.',
+      );
+    } finally {
+      setRecommendationsLoading(false);
+    }
+  }
+
+  function handleFeedback(track: TrackResult, action: TrackFeedback) {
+    try {
+      const nextProfile = action === 'like'
+        ? likeTrack(preferences, track)
+        : action === 'save'
+          ? saveTrack(preferences, track)
+          : skipTrack(preferences, track);
+      savePreferenceProfile(nextProfile);
+      setPreferences(nextProfile);
+      if (action === 'skip') {
+        setResult((current) =>
+          current
+            ? {
+                ...current,
+                recommendations: (current.recommendations ?? []).filter(
+                  (candidate) => candidate.track_id !== track.track_id,
+                ),
+              }
+            : current,
+        );
+      }
+      setError('');
+    } catch (feedbackError) {
+      console.error('Could not save local music preference', feedbackError);
+      setError('Your feedback could not be saved on this device. Please try again.');
     }
   }
 
@@ -224,7 +331,7 @@ export function MoodDiscovery() {
             </div>
             <div>
               <p className="text-base font-medium text-white">{analysisStages[stage]}</p>
-              <p className="mt-1 text-sm text-slate-500">Taking a moment to find the right feeling.</p>
+              <p className="mt-1 text-sm text-slate-500">An AI-generated signal for music discovery, not a diagnosis.</p>
               <div className="mt-3 flex gap-1.5" aria-hidden="true">
                 {analysisStages.map((item, index) => (
                   <span
@@ -247,7 +354,9 @@ export function MoodDiscovery() {
         >
           <CircleAlert className="mt-0.5 h-4 w-4 shrink-0 text-rose-300" aria-hidden="true" />
           <div>
-            <p className="font-medium">We couldn’t read your mood right now.</p>
+            <p className="font-medium">
+              {result ? 'We couldn’t find recommendations right now.' : 'We couldn’t read your mood right now.'}
+            </p>
             <p className="mt-1 text-rose-100/70">{error}</p>
           </div>
         </div>
@@ -283,11 +392,14 @@ export function MoodDiscovery() {
                     </div>
                   </div>
                   <p className="mt-5 max-w-lg text-sm leading-6 text-slate-400">{result.explanation}</p>
+                  <p className="mt-2 max-w-lg text-xs leading-5 text-slate-500">
+                    This is an AI interpretation to help shape music picks, not a psychological assessment.
+                  </p>
                 </div>
 
                 <div className="min-w-52 rounded-2xl border border-white/[0.07] bg-black/20 p-4">
                   <div className="flex items-center justify-between text-xs text-slate-400">
-                    <span>Model confidence</span>
+                    <span>Model confidence · not accuracy</span>
                     <span className="font-medium tabular-nums text-slate-200">
                       {Math.round(result.confidence * 100)}%
                     </span>
@@ -310,12 +422,107 @@ export function MoodDiscovery() {
                 </div>
               </div>
 
-              {result.recommendations.length > 0 ? (
+              <div className="mt-8 border-t border-white/[0.07] pt-6" aria-live="polite">
+                <h3 className="text-sm font-medium text-white">Choose what you want from the music</h3>
+                <p className="mt-1 text-xs text-slate-500">Your intent is separate from the emotion signal.</p>
+                <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                  {listeningIntents.map((option) => (
+                    <button
+                      key={option}
+                      type="button"
+                      onClick={() => {
+                        setIntent(option);
+                        setResult((current) =>
+                          current ? { ...current, recommendations: undefined } : current,
+                        );
+                      }}
+                      aria-pressed={intent === option}
+                      className={`min-h-11 rounded-xl border px-3 py-2 text-left text-xs transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-300 ${
+                        intent === option
+                          ? 'border-violet-200/30 bg-violet-200/[0.12] text-violet-100'
+                          : 'border-white/[0.08] bg-white/[0.025] text-slate-400 hover:border-white/20 hover:text-white'
+                      }`}
+                    >
+                      {listeningIntentLabels[option]}
+                    </button>
+                  ))}
+                </div>
+                <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <label htmlFor="recommendation-language" className="sr-only">
+                    Recommendation language
+                  </label>
+                  <select
+                    id="recommendation-language"
+                    value={language}
+                    onChange={(event) => {
+                      setLanguage(event.target.value);
+                      setResult((current) =>
+                        current ? { ...current, recommendations: undefined } : current,
+                      );
+                    }}
+                    className="min-h-11 w-full rounded-xl border border-white/[0.08] bg-[#171721] px-3 text-xs text-slate-300 outline-none transition focus-visible:ring-2 focus-visible:ring-violet-300/70 sm:w-auto"
+                  >
+                    {languageOptions.map((option) => (
+                      <option key={option} value={option}>
+                        {option === 'All' ? 'All languages' : option}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    onClick={generateRecommendations}
+                    disabled={recommendationsLoading}
+                    className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-violet-400 to-indigo-400 px-5 text-sm font-medium text-[#100e19] transition hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-200 focus-visible:ring-offset-2 focus-visible:ring-offset-[#101019] disabled:cursor-wait disabled:opacity-60 sm:w-auto"
+                  >
+                    {recommendationsLoading ? (
+                      <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden="true" />
+                    ) : (
+                      <ArrowRight className="h-4 w-4" aria-hidden="true" />
+                    )}
+                    {recommendationsLoading
+                      ? 'Finding your picks'
+                      : result.recommendations
+                        ? 'Refresh picks'
+                        : 'Find my music'}
+                  </button>
+                </div>
+              </div>
+
+              <div className="mt-7 rounded-2xl border border-white/[0.06] bg-black/15 p-4 sm:p-5">
+                <div className="flex items-center justify-between gap-3">
+                  <h3 className="text-xs font-medium text-slate-300">Emotional profile</h3>
+                  <span className="text-[10px] text-slate-500">Model signal, not a diagnosis</span>
+                </div>
+                <div className="mt-4 grid grid-cols-2 gap-x-5 gap-y-3 sm:grid-cols-4">
+                  {(['happy', 'sad', 'energetic', 'chill'] as const).map((mood) => (
+                    <div key={mood}>
+                      <div className="mb-1.5 flex justify-between text-[10px] text-slate-400">
+                        <span>{moodMeta[mood].label}</span>
+                        <span>{Math.round(result.mood_affinities[mood] * 100)}%</span>
+                      </div>
+                      <div
+                        className="h-1 overflow-hidden rounded-full bg-white/[0.08]"
+                        role="img"
+                        aria-label={`${moodMeta[mood].label} affinity ${Math.round(result.mood_affinities[mood] * 100)} percent`}
+                      >
+                        <div
+                          className={`h-full rounded-full bg-gradient-to-r ${moodMeta[mood].gradient}`}
+                          style={{ width: `${Math.round(result.mood_affinities[mood] * 100)}%` }}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {result.recommendations && result.recommendations.length > 0 ? (
                 <div className="mt-9 border-t border-white/[0.07] pt-6">
                   <div className="mb-5 flex items-end justify-between gap-4">
                     <div>
                       <p className="text-sm font-medium text-white">Music for your mood</p>
-                      <p className="mt-1 text-xs text-slate-500">A selection built around this moment.</p>
+                      <p className="mt-1 text-xs text-slate-500">
+                        Shaped by your mood, intent, and listening preferences.
+                      </p>
                     </div>
                     <span className="text-xs text-slate-500">
                       {result.recommendations.length} tracks
@@ -323,17 +530,29 @@ export function MoodDiscovery() {
                   </div>
                   <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4">
                     {result.recommendations.map((track, index) => (
-                      <MusicCard key={`${track.track_url}-${index}`} track={track} index={index} />
+                      <MusicCard
+                        key={track.track_id}
+                        track={track}
+                        index={index}
+                        onFeedback={handleFeedback}
+                        feedback={{
+                          liked: preferences.likedTrackIds.includes(track.track_id),
+                          saved: preferences.savedTrackIds.includes(track.track_id),
+                          skipped: preferences.skippedTrackIds.includes(track.track_id),
+                        }}
+                      />
                     ))}
                   </div>
                 </div>
-              ) : (
+              ) : result.recommendations && result.recommendations.length === 0 ? (
                 <div className="mt-9 rounded-2xl border border-white/[0.07] bg-black/20 p-6 text-center">
                   <Disc3 className="mx-auto h-7 w-7 text-slate-500" aria-hidden="true" />
-                  <p className="mt-3 text-sm font-medium text-white">No tracks found for this selection.</p>
-                  <p className="mt-1 text-xs text-slate-500">Try another language to broaden the search.</p>
+                  <p className="mt-3 text-sm font-medium text-white">No fresh picks in this set.</p>
+                  <p className="mt-1 text-xs text-slate-500">
+                    Try another language, choose a different intent, or refresh for another set.
+                  </p>
                 </div>
-              )}
+              ) : null}
             </div>
           </motion.section>
         ) : null}

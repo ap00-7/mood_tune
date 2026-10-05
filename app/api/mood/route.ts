@@ -1,31 +1,11 @@
 import { NextResponse } from 'next/server';
 
-import { moodMeta, type Mood } from '@/lib/mood';
-import { getRecommendations } from '@/lib/recommendations';
+import { moodMeta } from '@/lib/mood';
+import { isMlPrediction } from '@/lib/ml-contract';
+import { isListeningIntent } from '@/lib/listening-intent';
 
 const MAX_TEXT_LENGTH = 2000;
 const ML_TIMEOUT_MS = 30_000;
-
-type MlPrediction = {
-  emotion: string;
-  mood: Mood;
-  confidence: number;
-  model?: string;
-};
-
-function isMlPrediction(value: unknown): value is MlPrediction {
-  if (!value || typeof value !== 'object') return false;
-
-  const prediction = value as Record<string, unknown>;
-  return (
-    typeof prediction.emotion === 'string' &&
-    ['happy', 'sad', 'energetic', 'chill'].includes(String(prediction.mood)) &&
-    typeof prediction.confidence === 'number' &&
-    Number.isFinite(prediction.confidence) &&
-    prediction.confidence >= 0 &&
-    prediction.confidence <= 1
-  );
-}
 
 export async function POST(request: Request) {
   let body: unknown;
@@ -48,11 +28,10 @@ export async function POST(request: Request) {
     );
   }
 
-  const language = typeof input.language === 'string' ? input.language.trim() : 'All';
-  const limit =
-    typeof input.limit === 'number' && Number.isInteger(input.limit)
-      ? Math.min(10, Math.max(1, input.limit))
-      : 5;
+  if (input.intent !== undefined && input.intent !== null && !isListeningIntent(input.intent)) {
+    return NextResponse.json({ error: 'Choose one of the supported listening intents.' }, { status: 400 });
+  }
+  const intent = input.intent === undefined || input.intent === null ? null : input.intent;
   const mlApiUrl = process.env.ML_API_URL?.trim();
 
   if (!mlApiUrl) {
@@ -73,7 +52,7 @@ export async function POST(request: Request) {
     predictionResponse = await fetch(`${mlApiUrl.replace(/\/+$/, '')}/predict`, {
       method: 'POST',
       headers,
-      body: JSON.stringify({ text }),
+      body: JSON.stringify({ text, intent }),
       signal: AbortSignal.timeout(ML_TIMEOUT_MS),
       cache: 'no-store',
     });
@@ -109,7 +88,7 @@ export async function POST(request: Request) {
     );
   }
 
-  if (!isMlPrediction(prediction)) {
+  if (!isMlPrediction(prediction, intent)) {
     console.error('ML service returned an invalid prediction response');
     return NextResponse.json(
       { error: 'Mood analysis is temporarily unavailable. Please try again.' },
@@ -117,24 +96,9 @@ export async function POST(request: Request) {
     );
   }
 
-  try {
-    const recommendations = await getRecommendations({
-      mood: prediction.mood,
-      language,
-      limit,
-    });
-
-    return NextResponse.json({
-      ...prediction,
-      label: moodMeta[prediction.mood].label,
-      explanation: moodMeta[prediction.mood].description,
-      recommendations,
-    });
-  } catch (error) {
-    console.error('Recommendation generation failed', error);
-    return NextResponse.json(
-      { error: 'Recommendations are temporarily unavailable. Please try again.' },
-      { status: 500 },
-    );
-  }
+  return NextResponse.json({
+    ...prediction,
+    label: moodMeta[prediction.mood].label,
+    explanation: moodMeta[prediction.mood].description,
+  });
 }

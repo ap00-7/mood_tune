@@ -17,10 +17,10 @@ export default function HomePage() {
             </p>
             <h1 className="mt-7 max-w-2xl text-balance text-[3.3rem] font-semibold leading-[0.98] tracking-[-0.065em] text-white sm:text-6xl lg:text-[5.25rem]">
               Music that
-              <span className="block text-gradient">matches your mood.</span>
+              <span className="block text-gradient">moves with you.</span>
             </h1>
             <p className="mt-6 max-w-lg text-pretty text-base leading-7 text-slate-400 sm:text-lg sm:leading-8">
-              Tell us what’s on your mind. Find a soundtrack that feels right for wherever you are.
+              Turn how you’re feeling into music discovery that learns from your choices—without claiming to know exactly how you feel.
             </p>
             <div className="mt-9 flex flex-col gap-3 sm:flex-row">
               <Link href="/mood" className="button-primary">
@@ -101,8 +101,8 @@ export default function HomePage() {
         <div className="grid gap-4 md:grid-cols-3">
           {[
             { title: 'Say what you feel', copy: 'A simple reflection gives your listening a starting point.', icon: Sparkles },
-            { title: 'Find the feeling', copy: 'A transformer model reads emotional context and returns a mood.', icon: AudioLines },
-            { title: 'Follow the sound', copy: 'Explore tracks selected from the music catalog for that mood.', icon: Headphones },
+            { title: 'Find the signal', copy: 'A pretrained emotion model offers one interpretation—not a diagnosis.', icon: AudioLines },
+            { title: 'Shape what comes next', copy: 'Likes, saves, and skips tune future picks on this device.', icon: Headphones },
           ].map(({ title, copy, icon: Icon }, index) => (
             <article key={title} className="feature-tile rounded-2xl border border-white/[0.07] bg-[#101019] p-6 sm:p-7">
               <div className="flex items-center justify-between">

@@ -4,7 +4,7 @@ import { CatalogBrowser } from '@/components/catalog-browser';
 
 export const metadata: Metadata = {
   title: 'Your recommendations — MoodTune',
-  description: 'Explore mood-aware music recommendations from the MoodTune catalog.',
+  description: 'Explore recommendations shaped by your mood, listening intent, and local preferences.',
 };
 
 export default function RecommendationsPage() {

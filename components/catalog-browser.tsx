@@ -6,6 +6,16 @@ import { ArrowRight, Disc3, LoaderCircle, RefreshCw, SlidersHorizontal } from 'l
 
 import { MusicCard, type TrackResult } from '@/components/music-card';
 import { moodMeta, type Mood } from '@/lib/mood';
+import {
+  createDefaultPreferenceProfile,
+  likeTrack,
+  loadPreferenceProfile,
+  saveTrack,
+  savePreferenceProfile,
+  skipTrack,
+  type PreferenceProfile,
+  type TrackFeedback,
+} from '@/lib/preferences';
 
 const moods: Mood[] = ['happy', 'chill', 'energetic', 'sad'];
 const languages = [
@@ -41,20 +51,24 @@ export function CatalogBrowser({
   const [mood, setMood] = useState<Mood>('happy');
   const [language, setLanguage] = useState('All');
   const [tracks, setTracks] = useState<TrackResult[]>([]);
+  const [preferences, setPreferences] = useState<PreferenceProfile>(createDefaultPreferenceProfile);
+  const [preferencesReady, setPreferencesReady] = useState(false);
   const [offset, setOffset] = useState(0);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
   const reduceMotion = useReducedMotion();
 
+  useEffect(() => {
+    setPreferences(loadPreferenceProfile());
+    setPreferencesReady(true);
+  }, []);
+
   const fetchTracks = useCallback(async (requestedOffset: number, signal?: AbortSignal) => {
-    const params = new URLSearchParams({
-      mood,
-      language,
-      limit: String(PAGE_SIZE),
-      offset: String(requestedOffset),
-    });
-    const response = await fetch(`/api/recommendations?${params.toString()}`, {
+    const response = await fetch('/api/recommendations', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ mood, language, limit: PAGE_SIZE, offset: requestedOffset, preferences }),
       signal,
       cache: 'no-store',
     });
@@ -70,9 +84,10 @@ export function CatalogBrowser({
       throw new Error('Music discovery returned an unexpected response.');
     }
     return (payload as CatalogResult).tracks;
-  }, [language, mood]);
+  }, [language, mood, preferences]);
 
   useEffect(() => {
+    if (!preferencesReady) return;
     const controller = new AbortController();
     setLoading(true);
     setError('');
@@ -89,7 +104,26 @@ export function CatalogBrowser({
         if (!controller.signal.aborted) setLoading(false);
       });
     return () => controller.abort();
-  }, [fetchTracks]);
+  }, [fetchTracks, preferencesReady]);
+
+  function handleFeedback(track: TrackResult, action: TrackFeedback) {
+    try {
+      const nextProfile = action === 'like'
+        ? likeTrack(preferences, track)
+        : action === 'save'
+          ? saveTrack(preferences, track)
+          : skipTrack(preferences, track);
+      savePreferenceProfile(nextProfile);
+      setPreferences(nextProfile);
+      if (action === 'skip') {
+        setTracks((current) => current.filter((candidate) => candidate.track_id !== track.track_id));
+      }
+      setError('');
+    } catch (feedbackError) {
+      console.error('Could not save local music preference', feedbackError);
+      setError('Your feedback could not be saved on this device. Please try again.');
+    }
+  }
 
   async function refreshTracks() {
     if (refreshing || loading) return;
@@ -129,9 +163,14 @@ export function CatalogBrowser({
           </h1>
           <p className="mt-3 max-w-xl text-sm leading-6 text-slate-400 sm:text-base">
             {recommendationsView
-              ? 'Choose a mood and language to explore a fresh set from the MoodTune catalog.'
+              ? 'Catalog picks blend your selected mood, local listening preferences, and available track features. Choose an intent from Mood discovery for a more tailored set.'
               : 'Browse music by the mood you want to sit with. No analysis needed.'}
           </p>
+          {recommendationsView && preferences.likedTrackIds.length + preferences.savedTrackIds.length === 0 ? (
+            <p className="mt-2 max-w-xl text-xs leading-5 text-slate-500">
+              Starting fresh? Mood and catalog features are enough to get useful picks. Likes and saves will tune future sets.
+            </p>
+          ) : null}
         </div>
         <div className="flex items-center gap-2 self-start rounded-full border border-white/[0.08] bg-white/[0.03] px-3 py-2 text-xs text-slate-400 sm:self-auto">
           <SlidersHorizontal className="h-3.5 w-3.5" aria-hidden="true" />
@@ -226,15 +265,33 @@ export function CatalogBrowser({
             className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4 xl:grid-cols-6"
           >
             {tracks.map((track, index) => (
-              <MusicCard key={`${track.track_url}-${index}`} track={track} index={index} />
+              <MusicCard
+                key={track.track_id}
+                track={track}
+                index={index}
+                onFeedback={handleFeedback}
+                feedback={{
+                  liked: preferences.likedTrackIds.includes(track.track_id),
+                  saved: preferences.savedTrackIds.includes(track.track_id),
+                  skipped: preferences.skippedTrackIds.includes(track.track_id),
+                }}
+              />
             ))}
           </motion.div>
         ) : !error ? (
           <div className="grid min-h-64 place-items-center rounded-3xl border border-white/[0.06] bg-white/[0.02] px-6 text-center">
             <div>
               <Disc3 className="mx-auto h-8 w-8 text-slate-600" aria-hidden="true" />
-              <h3 className="mt-4 text-lg font-medium text-white">Nothing in this corner just yet.</h3>
-              <p className="mt-2 text-sm text-slate-500">Try another mood or remove the language filter.</p>
+              <h3 className="mt-4 text-lg font-medium text-white">
+                {preferences.skippedTrackIds.length > 0
+                  ? 'No fresh picks in this set.'
+                  : 'Nothing in this corner just yet.'}
+              </h3>
+              <p className="mt-2 text-sm text-slate-500">
+                {preferences.skippedTrackIds.length > 0
+                  ? 'Tracks you skipped stay out of recommendations on this device. Try another mood or language.'
+                  : 'Try another mood or remove the language filter. Your first picks work without any listening history.'}
+              </p>
             </div>
           </div>
         ) : null}

@@ -74,6 +74,7 @@ async def predict(payload: PredictionRequest, request: Request) -> PredictionRes
 
     try:
         result = await run_in_threadpool(predict_emotion, payload.text, classifier)
+        result["intent"] = payload.intent
         return PredictionResponse(**result)
     except Exception as error:
         logger.exception("Emotion inference failed")

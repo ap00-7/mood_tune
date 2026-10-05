@@ -1,23 +1,37 @@
 import Image from 'next/image';
-import { ArrowUpRight, Disc3 } from 'lucide-react';
+import { ArrowUpRight, Bookmark, Disc3, Heart, SkipForward } from 'lucide-react';
+
+import type { Mood } from '@/lib/mood';
+import type { TrackFeedback } from '@/lib/preferences';
 
 export type TrackResult = {
+  track_id: string;
   track_name: string;
   artist_name: string;
-  valence: number;
-  energy: number;
-  danceability: number;
+  valence: number | null;
+  energy: number | null;
+  danceability: number | null;
   artwork_url: string;
   track_url: string;
   language: string;
+  mood: Mood | null;
+  popularity: number | null;
+  score?: {
+    total: number;
+    weights: Record<string, number>;
+  };
 };
 
 export function MusicCard({
   track,
   index,
+  feedback,
+  onFeedback,
 }: {
   track: TrackResult;
   index: number;
+  feedback?: { liked: boolean; saved: boolean; skipped: boolean };
+  onFeedback?: (track: TrackResult, action: TrackFeedback) => void;
 }) {
   const hasLanguage = track.language && !['unknown', 'global'].includes(track.language.toLowerCase());
 
@@ -64,6 +78,41 @@ export function MusicCard({
           </div>
         </div>
       </a>
+      {onFeedback ? (
+        <div className="mt-2 flex items-center justify-end gap-1 border-t border-white/[0.06] pt-2">
+          <button
+            type="button"
+            onClick={() => onFeedback(track, 'like')}
+            aria-label={`Like ${track.track_name}`}
+            aria-pressed={feedback?.liked ?? false}
+            className={`rounded-lg p-2 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-300 ${
+              feedback?.liked ? 'text-rose-300' : 'text-slate-500 hover:text-rose-300'
+            }`}
+          >
+            <Heart className="h-4 w-4" fill={feedback?.liked ? 'currentColor' : 'none'} aria-hidden="true" />
+          </button>
+          <button
+            type="button"
+            onClick={() => onFeedback(track, 'save')}
+            aria-label={`Save ${track.track_name}`}
+            aria-pressed={feedback?.saved ?? false}
+            className={`rounded-lg p-2 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-300 ${
+              feedback?.saved ? 'text-violet-200' : 'text-slate-500 hover:text-violet-200'
+            }`}
+          >
+            <Bookmark className="h-4 w-4" fill={feedback?.saved ? 'currentColor' : 'none'} aria-hidden="true" />
+          </button>
+          <button
+            type="button"
+            onClick={() => onFeedback(track, 'skip')}
+            aria-label={`Skip ${track.track_name}`}
+            aria-pressed={feedback?.skipped ?? false}
+            className="rounded-lg p-2 text-slate-500 transition hover:text-amber-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-300"
+          >
+            <SkipForward className="h-4 w-4" aria-hidden="true" />
+          </button>
+        </div>
+      ) : null}
     </article>
   );
 }
