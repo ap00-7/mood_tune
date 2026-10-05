@@ -1,16 +1,21 @@
 # MoodTune ML Service
 
-Small FastAPI service that runs the original Hugging Face emotion classifier and maps its top prediction to MoodTune's existing mood categories. It is deployed separately from the Next.js application.
+FastAPI service that runs the original Hugging Face emotion classifier through a CPU-only ONNX Runtime adapter. It is deployed separately from the Next.js application.
 
 ## Model and inference
 
-- Model: `j-hartmann/emotion-english-distilroberta-base`
-- Inference: `transformers.pipeline("text-classification", model=MODEL_ID, top_k=None)`
+- Source model: `j-hartmann/emotion-english-distilroberta-base`
+- Production artifact: `onnx-community/emotion-english-distilroberta-base-ONNX`, pinned to commit `f4407dc20b99ae081ab2e4f089595e70c1609f59`
+- Production precision: pre-quantized INT8 ONNX, `onnx/model_int8.onnx` (82,749,526 bytes; about 78.9 MiB)
+- Runtime: ONNX Runtime `CPUExecutionProvider`, NumPy softmax, and the model's pinned `tokenizer.json`/`config.json`
+- The tokenizer is configured for dynamic sequence lengths with the original 512-token truncation limit. Its token IDs were compared with the original Hugging Face tokenizer, including Unicode and long input.
 - The model is loaded once during FastAPI application startup.
-- The loaded model's `id2label` config is validated and its complete returned probability distribution is sorted high-to-low. The primary emotion is the top label and confidence is its exact model score.
+- The artifact's `id2label` config is validated against the original seven labels. ONNX logits are converted to softmax probabilities; the complete distribution is sorted high-to-low. The primary emotion is the top label and confidence is its exact model score.
 - Model probabilities are not a measure of emotional accuracy. The mood affinity distribution sums model scores by the original mapping and normalizes those totals; unknown labels retain the original app's `"chill"` fallback.
 - Listening intent is a separate optional input, never inferred from text. The current allowed values are `match_mood`, `lift_me_up`, `calm_me_down`, and `add_energy`.
 - The complete emotion-to-mood mapping is retained from `mood_recommender/app.py`.
+
+The previous Transformers/PyTorch implementation remains available behind `ML_INFERENCE_BACKEND=pytorch`. Its dependencies are kept separately from production in `requirements-pytorch.txt`; production installs do not install PyTorch or CUDA/NVIDIA packages. To run that rollback path, install both requirements files and select the backend explicitly.
 
 ## Local setup
 
@@ -33,7 +38,7 @@ $env:ML_API_KEY = 'your-local-shared-secret'
 uvicorn app:app --host 127.0.0.1 --port 8000
 ```
 
-The first startup downloads model files from Hugging Face; subsequent starts use the Hugging Face cache. Model inference runs on CPU unless the deployment provides a supported accelerator.
+The first startup downloads the pinned ONNX, tokenizer, and config files from Hugging Face; subsequent starts use the Hugging Face cache. The service explicitly loads only the CPU provider.
 
 ## Endpoints
 
@@ -103,9 +108,21 @@ docker build -t moodtune-ml ./ml_service
 docker run --rm -p 8000:8000 -e ML_API_KEY=your-server-secret moodtune-ml
 ```
 
-Deploy the container to Railway, Render, Fly.io, or another container host. Configure `ML_API_KEY` and a persistent volume mounted at `/home/app/.cache/huggingface` to avoid downloading model weights on every replacement deployment. Configure the Next.js Vercel project with:
+The production image defaults to `ML_INFERENCE_BACKEND=onnx`. Configure `ML_API_KEY` and, if the host supports it, a persistent volume mounted at `/home/app/.cache/huggingface` to avoid downloading the approximately 79 MiB model artifact and tokenizer again after replacement deployments. Configure the Next.js Vercel project with:
 
 - `ML_API_URL`: the deployed service's HTTPS origin, without `/predict`
 - `ML_API_KEY`: the same server-to-server secret
 
 Restrict the service to HTTPS and use the shared key or the hosting provider's private networking when available. Never use a `NEXT_PUBLIC_` prefix for the key.
+
+## Verification
+
+Run the offline unit/API suite after installing test dependencies:
+
+```powershell
+python -m pip install -r ml_service/requirements-test.txt
+Set-Location ml_service
+python -m unittest discover -s tests -v
+```
+
+To run the five-input INT8-vs-PyTorch model regression (downloads the pinned artifact if it is not cached), set `MOODTUNE_RUN_MODEL_REGRESSION=1` before unittest discovery. The stored baseline allows a maximum absolute per-label probability difference of 0.03 and requires the same top label for each representative input.

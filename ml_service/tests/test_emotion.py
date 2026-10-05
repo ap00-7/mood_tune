@@ -1,4 +1,7 @@
 import unittest
+import sys
+from types import ModuleType
+from unittest.mock import Mock, patch
 
 from emotion import MODEL_ID, aggregate_mood_affinities, load_emotion_classifier, predict_emotion
 from mood_mapping import EMOTION_TO_MOOD, map_emotion_to_mood
@@ -19,11 +22,9 @@ class EmotionServiceTests(unittest.TestCase):
     class Classifier:
         def __init__(self, predictions: list[dict[str, str | float]], labels: dict[int, str] | None = None):
             self.predictions = predictions
-            self.model = type("Model", (), {"config": type("Config", (), {"id2label": labels or EmotionServiceTests.labels})()})()
-            self.kwargs: dict[str, object] = {}
+            self.id2label = labels or EmotionServiceTests.labels
 
-        def __call__(self, text: str, **kwargs: object) -> list[dict[str, str | float]]:
-            self.kwargs = kwargs
+        def predict(self, _text: str) -> list[dict[str, str | float]]:
             return self.predictions
 
     def full_distribution(self) -> list[dict[str, str | float]]:
@@ -67,7 +68,6 @@ class EmotionServiceTests(unittest.TestCase):
         self.assertEqual(result["mood"], "happy")
         self.assertEqual(result["confidence"], 0.72)
         self.assertEqual(result["model"], MODEL_ID)
-        self.assertEqual(classifier.kwargs, {"truncation": True, "max_length": 512, "top_k": None})
         self.assertEqual(result["emotion_scores"][0], {"emotion": "joy", "score": 0.72})
         self.assertEqual({item["emotion"] for item in result["emotion_scores"]}, set(self.labels.values()))
         self.assertEqual(result["mood_affinities"]["happy"], 0.72)
@@ -122,16 +122,41 @@ class EmotionServiceTests(unittest.TestCase):
             PredictionResponse(**result)
 
     def test_classifier_load_uses_full_distribution_and_configured_model_labels(self) -> None:
-        from unittest.mock import patch
-
         classifier = self.Classifier(self.full_distribution())
-        with patch("emotion.pipeline", return_value=classifier) as mocked_pipeline:
-            self.assertIs(load_emotion_classifier(), classifier)
+        fake_transformers = ModuleType("transformers")
+        mocked_pipeline = Mock(return_value=type(
+            "Pipeline",
+            (),
+            {
+                "model": type(
+                    "Model",
+                    (),
+                    {"config": type("Config", (), {"id2label": self.labels})()},
+                )(),
+                "__call__": lambda _self, _text, **kwargs: (
+                    setattr(classifier, "pipeline_kwargs", kwargs) or classifier.predictions
+                ),
+            },
+        )())
+        fake_transformers.pipeline = mocked_pipeline  # type: ignore[attr-defined]
+        with patch.dict(sys.modules, {"transformers": fake_transformers}):
+            loaded = load_emotion_classifier("pytorch")
+            result = predict_emotion("I feel good", loaded)
+
         mocked_pipeline.assert_called_once_with(
             "text-classification",
             model=MODEL_ID,
             top_k=None,
         )
+        self.assertEqual(result["emotion"], "joy")
+        self.assertEqual(
+            classifier.pipeline_kwargs,
+            {"truncation": True, "max_length": 512, "top_k": None},
+        )
+
+    def test_invalid_backend_is_rejected(self) -> None:
+        with self.assertRaisesRegex(RuntimeError, "ML_INFERENCE_BACKEND"):
+            load_emotion_classifier("keyword")
 
 
 if __name__ == "__main__":

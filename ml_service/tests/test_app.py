@@ -10,29 +10,17 @@ from emotion import MODEL_ID
 class FakeClassifier:
     def __init__(self, label: str = "joy") -> None:
         self.label = label
-        self.model = type(
-            "Model",
-            (),
-            {
-                "config": type(
-                    "Config",
-                    (),
-                    {
-                        "id2label": {
-                            0: "anger",
-                            1: "disgust",
-                            2: "fear",
-                            3: "joy",
-                            4: "neutral",
-                            5: "sadness",
-                            6: "surprise",
-                        }
-                    },
-                )()
-            },
-        )()
+        self.id2label = {
+            0: "anger",
+            1: "disgust",
+            2: "fear",
+            3: "joy",
+            4: "neutral",
+            5: "sadness",
+            6: "surprise",
+        }
 
-    def __call__(self, _text: str, **_kwargs: object) -> list[dict[str, str | float]]:
+    def predict(self, _text: str) -> list[dict[str, str | float]]:
         return [
             {"label": self.label, "score": 0.72},
             {"label": "disgust", "score": 0.01},
@@ -45,6 +33,14 @@ class FakeClassifier:
 
 
 class PredictionEndpointTests(unittest.TestCase):
+    def test_health_reports_loaded_model(self) -> None:
+        with patch("app.load_emotion_classifier", return_value=FakeClassifier()):
+            with TestClient(app) as client:
+                response = client.get("/health")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), {"status": "ok", "model_loaded": True})
+
     def test_predict_returns_full_distribution_and_explicit_intent(self) -> None:
         with patch("app.load_emotion_classifier", return_value=FakeClassifier()):
             with TestClient(app) as client:
