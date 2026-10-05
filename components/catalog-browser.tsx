@@ -43,11 +43,7 @@ type CatalogResult = {
   tracks: TrackResult[];
 };
 
-export function CatalogBrowser({
-  recommendationsView = false,
-}: {
-  recommendationsView?: boolean;
-}) {
+export function CatalogBrowser() {
   const [mood, setMood] = useState<Mood>('happy');
   const [language, setLanguage] = useState('All');
   const [tracks, setTracks] = useState<TrackResult[]>([]);
@@ -77,11 +73,11 @@ export function CatalogBrowser({
       const message =
         payload && typeof payload === 'object' && 'error' in payload && typeof payload.error === 'string'
           ? payload.error
-          : 'Music discovery is temporarily unavailable. Please try again.';
+          : 'Recommendations are temporarily unavailable. Please try again.';
       throw new Error(message);
     }
     if (!payload || typeof payload !== 'object' || !('tracks' in payload) || !Array.isArray(payload.tracks)) {
-      throw new Error('Music discovery returned an unexpected response.');
+      throw new Error('Recommendations returned an unexpected response.');
     }
     return (payload as CatalogResult).tracks;
   }, [language, mood, preferences]);
@@ -144,7 +140,7 @@ export function CatalogBrowser({
       setError(
         refreshError instanceof Error
           ? refreshError.message
-          : 'Music discovery is temporarily unavailable. Please try again.',
+          : 'Recommendations are temporarily unavailable. Please try again.',
       );
     } finally {
       setRefreshing(false);
@@ -157,16 +153,14 @@ export function CatalogBrowser({
     <div className="mx-auto max-w-7xl px-5 pb-24 pt-14 sm:px-8 sm:pt-20">
       <header className="flex flex-col gap-6 border-b border-white/[0.07] pb-8 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <p className="eyebrow">{recommendationsView ? 'A little more in tune' : 'Made for exploration'}</p>
+          <p className="eyebrow">A little more in tune</p>
           <h1 className="mt-4 text-4xl font-semibold tracking-[-0.045em] text-white sm:text-5xl">
-            {recommendationsView ? 'Your listening, your way.' : 'Follow a feeling.'}
+            Your listening, your way.
           </h1>
           <p className="mt-3 max-w-xl text-sm leading-6 text-slate-400 sm:text-base">
-            {recommendationsView
-              ? 'Catalog picks blend your selected mood, local listening preferences, and available track features. Choose an intent from Mood discovery for a more tailored set.'
-              : 'Browse music by the mood you want to sit with. No analysis needed.'}
+            Catalog picks blend your selected mood, local listening preferences, and available track features. Choose an intent in Mood for a more tailored set.
           </p>
-          {recommendationsView && preferences.likedTrackIds.length + preferences.savedTrackIds.length === 0 ? (
+          {preferences.likedTrackIds.length + preferences.savedTrackIds.length === 0 ? (
             <p className="mt-2 max-w-xl text-xs leading-5 text-slate-500">
               Starting fresh? Mood and catalog features are enough to get useful picks. Likes and saves will tune future sets.
             </p>

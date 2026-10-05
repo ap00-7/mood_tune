@@ -2,11 +2,10 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Compass, Headphones, Home, Info, Sparkles } from 'lucide-react';
+import { Headphones, Home, Info, Sparkles } from 'lucide-react';
 
 const navItems = [
   { label: 'Home', href: '/', icon: Home },
-  { label: 'Discover', href: '/discover', icon: Compass },
   { label: 'Mood', href: '/mood', icon: Sparkles },
   { label: 'Recommendations', href: '/recommendations', icon: Headphones },
   { label: 'About', href: '/about', icon: Info },
@@ -59,7 +58,7 @@ export function Navbar() {
 
       <nav
         aria-label="Mobile navigation"
-        className="mobile-nav fixed inset-x-0 bottom-0 z-50 grid grid-cols-5 border-t border-white/10 bg-[#0b0b13]/95 px-2 pb-[max(env(safe-area-inset-bottom),0.5rem)] pt-2 backdrop-blur-2xl md:hidden"
+        className="mobile-nav fixed inset-x-0 bottom-0 z-50 grid grid-cols-4 border-t border-white/10 bg-[#0b0b13]/95 px-2 pb-[max(env(safe-area-inset-bottom),0.5rem)] pt-2 backdrop-blur-2xl md:hidden"
       >
         {navItems.map(({ label, href, icon: Icon }) => {
           const active = pathname === href;

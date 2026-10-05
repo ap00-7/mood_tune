@@ -76,7 +76,6 @@ The model service is intentionally separate; the transformer and PyTorch runtime
 ## Product Routes
 
 - `/` — product landing page
-- `/discover` — browse catalog recommendations by mood and language
 - `/mood` — analyze a text description, choose listening intent, and generate personalized recommendations
 - `/recommendations` — explore catalog picks with mood and language filters
 - `/about` — architecture and implementation overview

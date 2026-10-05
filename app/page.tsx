@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { ArrowDownRight, ArrowUpRight, AudioLines, Disc3, Headphones, Sparkles } from 'lucide-react';
+import { ArrowRight, ArrowUpRight, AudioLines, Disc3, Headphones, Sparkles } from 'lucide-react';
 
 const soundBars = [28, 48, 34, 72, 44, 86, 57, 38, 68, 43, 78, 30, 55, 40, 72, 34, 62, 45, 81, 36, 58, 27, 70, 42];
 
@@ -24,10 +24,10 @@ export default function HomePage() {
             </p>
             <div className="mt-9 flex flex-col gap-3 sm:flex-row">
               <Link href="/mood" className="button-primary">
-                Discover your mood <ArrowUpRight className="h-4 w-4" aria-hidden="true" />
+                Analyze your mood <ArrowUpRight className="h-4 w-4" aria-hidden="true" />
               </Link>
-              <Link href="/discover" className="button-secondary">
-                Explore music <ArrowDownRight className="h-4 w-4" aria-hidden="true" />
+              <Link href="/recommendations" className="button-secondary">
+                Browse recommendations <ArrowRight className="h-4 w-4" aria-hidden="true" />
               </Link>
             </div>
             <div className="mt-11 flex items-center gap-3 text-xs text-slate-500">
@@ -64,12 +64,24 @@ export default function HomePage() {
                 <span className="text-xs font-medium text-white">Find your frequency</span>
                 <Disc3 className="h-4 w-4 text-violet-200" aria-hidden="true" />
               </div>
-              <div className="flex h-10 items-center gap-[3px]" aria-hidden="true">
+              <div className="relative flex h-12 w-full items-center justify-between overflow-hidden" aria-hidden="true">
+                <span className="absolute inset-x-0 top-1/2 h-px bg-gradient-to-r from-transparent via-violet to-transparent opacity-20" />
+                <span
+                  className="absolute inset-x-[8%] top-1/2 h-7 -translate-y-1/2 rounded-full blur-md"
+                  style={{
+                    backgroundImage:
+                      'linear-gradient(to right, rgba(182,160,255,0.07), rgba(132,146,255,0.12), rgba(132,146,255,0.07))',
+                  }}
+                />
                 {soundBars.map((height, index) => (
                   <span
                     key={`${height}-${index}`}
-                    className="wave-bar w-[3px] rounded-full bg-gradient-to-t from-violet-500/70 to-sky-200/90"
-                    style={{ height: `${height}%`, animationDelay: `${index * 35}ms` }}
+                    className="wave-bar relative z-10 w-[3px] shrink-0 rounded-full bg-gradient-to-t from-violet via-fuchsia to-indigo opacity-80"
+                    style={{
+                      height: `${height}%`,
+                      animationDelay: `${index * 35}ms`,
+                      animationDuration: `${1.55 + (index % 4) * 0.12}s`,
+                    }}
                   />
                 ))}
               </div>
@@ -78,8 +90,8 @@ export default function HomePage() {
             <div className="absolute bottom-[24%] left-[12%] h-1.5 w-1.5 rounded-full bg-sky-200/80 shadow-[0_0_16px_rgba(125,211,252,.7)]" aria-hidden="true" />
           </div>
         </div>
-        <Link href="/discover" className="absolute bottom-7 left-1/2 hidden -translate-x-1/2 items-center gap-2 text-[10px] uppercase tracking-[0.25em] text-slate-600 transition hover:text-slate-300 lg:flex">
-          Find your next feeling <ArrowDownRight className="h-3.5 w-3.5" aria-hidden="true" />
+        <Link href="/recommendations" className="absolute bottom-7 left-1/2 hidden -translate-x-1/2 items-center gap-2 text-[10px] uppercase tracking-[0.25em] text-slate-600 transition hover:text-slate-300 lg:flex">
+          Browse recommendations <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
         </Link>
       </section>
 

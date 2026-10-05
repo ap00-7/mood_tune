@@ -10,7 +10,7 @@ export const metadata: Metadata = {
 export default function RecommendationsPage() {
   return (
     <main className="min-h-[calc(100svh-4.5rem)]">
-      <CatalogBrowser recommendationsView />
+      <CatalogBrowser />
     </main>
   );
 }

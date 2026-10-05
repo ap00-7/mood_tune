@@ -3,7 +3,7 @@ import type { Metadata } from 'next';
 import { MoodDiscovery } from '@/components/mood-discovery';
 
 export const metadata: Metadata = {
-  title: 'Discover your mood — MoodTune',
+  title: 'Analyze your mood — MoodTune',
   description: 'Share how you feel and find music for the moment.',
 };
 
