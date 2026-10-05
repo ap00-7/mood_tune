@@ -13,7 +13,7 @@ FastAPI service that runs the original Hugging Face emotion classifier through a
 - The artifact's `id2label` config is validated against the original seven labels. ONNX logits are converted to softmax probabilities; the complete distribution is sorted high-to-low. The primary emotion is the top label and confidence is its exact model score.
 - Model probabilities are not a measure of emotional accuracy. The mood affinity distribution sums model scores by the original mapping and normalizes those totals; unknown labels retain the original app's `"chill"` fallback.
 - Listening intent is a separate optional input, never inferred from text. The current allowed values are `match_mood`, `lift_me_up`, `calm_me_down`, and `add_energy`.
-- The complete emotion-to-mood mapping is retained from `mood_recommender/app.py`.
+- The complete emotion-to-mood mapping is maintained in `mood_mapping.py`.
 
 The previous Transformers/PyTorch implementation remains available behind `ML_INFERENCE_BACKEND=pytorch`. Its dependencies are kept separately from production in `requirements-pytorch.txt`; production installs do not install PyTorch or CUDA/NVIDIA packages. To run that rollback path, install both requirements files and select the backend explicitly.
 

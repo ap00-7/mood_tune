@@ -1,6 +1,6 @@
 # MoodTune
 
-MoodTune recommends music for a user's current emotional state. It preserves the original Hugging Face emotion classifier while rebuilding the product as a Next.js application backed by a focused Python ML service.
+MoodTune recommends music for a user's current emotional state. The production product is a Next.js application backed by a focused FastAPI service using CPU-only INT8 ONNX inference.
 
 ## Overview
 
@@ -8,7 +8,7 @@ The browser experience collects a short mood description, presents the model's r
 
 ## Features
 
-- Text emotion classification using the original Hugging Face model
+- Text emotion classification using the original Hugging Face model exported to INT8 ONNX
 - Faithful mapping from model emotion labels to MoodTune mood categories
 - Mood-based track selection and ranking from audio features
 - Language filtering and Spotify/external track links
@@ -20,7 +20,7 @@ The browser experience collects a short mood description, presents the model's r
 
 1. The user describes their mood in the Next.js interface.
 2. The Next.js API validates the text and sends it to the Python ML service.
-3. The ML service runs transformer inference and returns the complete, sorted emotion distribution and the top model score.
+3. The ML service runs the pinned INT8 ONNX model on CPU and returns the complete, sorted emotion distribution and the top model score.
 4. Emotion scores are aggregated through the original mapping into normalized mood affinities; unknown labels retain the `chill` fallback.
 5. The interface presents the detected signal; the user then explicitly selects a listening intent (`match_mood`, `lift_me_up`, `calm_me_down`, or `add_energy`). Intent is not inferred from text or by the model.
 6. Next.js sends the validated emotional context, selected intent, language filter, and device-local preference profile to rank catalog tracks.
@@ -42,18 +42,20 @@ Catalog pages browse successive slices of ranked results. Duplicate catalog IDs 
 ## Machine Learning
 
 - Model: `j-hartmann/emotion-english-distilroberta-base`
-- Library: Hugging Face Transformers, with `pipeline("text-classification", ..., top_k=None)`
+- Production runtime: pinned INT8 ONNX model with ONNX Runtime `CPUExecutionProvider`
+- Optional rollback runtime: Hugging Face Transformers and PyTorch, installed separately through `ml_service/requirements-pytorch.txt`
 - Model instance: loaded once during FastAPI application startup
 - Output: all configured emotion labels and their returned probabilities, sorted high-to-low; confidence equals the top score and is not a claim of emotional accuracy
 - Listening intent: optional, explicit recommendation input with deterministic valence, energy, and danceability targets
-- Mapping: all 110 emotion-to-mood entries are preserved from the original Streamlit app; unlisted labels default to `chill`, matching the original behavior
+- Mapping: all 110 emotion-to-mood entries are preserved; unlisted labels default to `chill`
 
 No keyword-based JavaScript detector or generated confidence score is used for inference. The recommender is deterministic and content-based; it does not train a model.
 
 ## Tech Stack
 
 - Next.js, React, TypeScript, and Tailwind CSS
-- Python, FastAPI, Hugging Face Transformers, and PyTorch
+- Python, FastAPI, ONNX Runtime, and NumPy for production inference
+- Optional Hugging Face Transformers/PyTorch rollback runtime
 - Framer Motion and Lucide icons
 - Existing CSV music catalog
 - Vercel for the Next.js app; a separate container host for Python inference
@@ -64,14 +66,14 @@ No keyword-based JavaScript detector or generated confidence score is used for i
 Browser
   -> Next.js frontend
   -> Next.js /api/mood
-  -> authenticated Python FastAPI /predict
-  -> Hugging Face transformer
+  -> Python FastAPI /predict
+  -> INT8 ONNX model on CPU
   -> emotion -> original MoodTune mood mapping
   -> Next.js recommendation engine
   -> local music catalog -> external music link
 ```
 
-The model service is intentionally separate; the transformer and PyTorch runtime are not bundled into Vercel's frontend deployment.
+The model service is intentionally separate; ML runtimes and model artifacts are not bundled into Vercel's frontend deployment.
 
 ## Product Routes
 
@@ -131,7 +133,7 @@ The Python service reads `ML_API_KEY` from its process environment. Its environm
 1. Deploy the Next.js application to Vercel.
 2. Deploy the [ml_service](./ml_service/) container to Railway, Render, Fly.io, or another persistent container host.
 3. Configure `ML_API_URL` in Vercel with the Python service's HTTPS origin.
-4. Set the same strong, private `ML_API_KEY` in Vercel and the Python host. Never prefix it with `NEXT_PUBLIC_`.
+4. If server-to-server authentication is enabled, set the same private `ML_API_KEY` in Vercel and the Python host. Never prefix it with `NEXT_PUBLIC_`.
 5. Keep the Python service warm and persist its Hugging Face cache so startup does not repeatedly download model files.
 
 See [ml_service/README.md](./ml_service/README.md) for service setup, endpoints, and container deployment details.
