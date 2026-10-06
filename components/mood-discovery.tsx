@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 
 import { MusicCard, type TrackResult } from '@/components/music-card';
+import { Button } from '@/components/ui/button';
 import {
   listeningIntentLabels,
   listeningIntents,
@@ -79,7 +80,7 @@ type MoodResponse = {
 export function MoodDiscovery() {
   const [text, setText] = useState('');
   const [language, setLanguage] = useState('All');
-  const [intent, setIntent] = useState<ListeningIntent>('match_mood');
+  const [intent, setIntent] = useState<ListeningIntent | null>(null);
   const [preferences, setPreferences] = useState<PreferenceProfile>(createDefaultPreferenceProfile);
   const [loading, setLoading] = useState(false);
   const [recommendationsLoading, setRecommendationsLoading] = useState(false);
@@ -105,7 +106,7 @@ export function MoodDiscovery() {
     setError('');
     setResult(null);
     setRecommendationsLoading(false);
-    setIntent('match_mood');
+    setIntent(null);
     const stageTimer = window.setTimeout(() => setStage(1), 650);
 
     try {
@@ -154,7 +155,7 @@ export function MoodDiscovery() {
   }
 
   async function generateRecommendations({ refresh = false }: { refresh?: boolean } = {}) {
-    if (!result || recommendationsLoading) return;
+    if (!result || !intent || recommendationsLoading) return;
     const excludedTrackIds = refresh
       ? result.recommendations?.map((track) => track.track_id) ?? []
       : [];
@@ -296,28 +297,30 @@ export function MoodDiscovery() {
                 A sentence or two works best · Ctrl + Enter to analyze
               </span>
             </div>
-            <div className="flex items-center justify-between gap-3 sm:justify-end">
+            <div className="flex items-center justify-end gap-3">
               <span id="mood-count" aria-live="polite" className="text-xs tabular-nums text-slate-600">
                 {remaining} left
               </span>
-              <button
-                type="submit"
-                disabled={loading || !text.trim()}
-                className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-violet-400 to-indigo-400 px-5 text-sm font-medium text-[#100e19] transition hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-200 focus-visible:ring-offset-2 focus-visible:ring-offset-[#101019] disabled:cursor-not-allowed disabled:opacity-40"
-              >
-                {loading ? (
-                  <>
-                    <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden="true" />
-                    Reading the moment
-                  </>
-                ) : (
-                  <>
-                    Analyze my mood <ArrowRight className="h-4 w-4" aria-hidden="true" />
-                  </>
-                )}
-              </button>
             </div>
           </div>
+        </div>
+        <div className="mt-4 flex justify-center">
+          <Button
+            type="submit"
+            disabled={loading || !text.trim()}
+            className="min-h-11 w-full gap-2 focus-visible:ring-offset-2 focus-visible:ring-offset-[#101019] sm:w-auto"
+          >
+            {loading ? (
+              <>
+                <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden="true" />
+                Reading the moment
+              </>
+            ) : (
+              <>
+                Analyze my mood <ArrowRight className="h-4 w-4" aria-hidden="true" />
+              </>
+            )}
+          </Button>
         </div>
       </form>
 
@@ -474,19 +477,6 @@ export function MoodDiscovery() {
                       </option>
                     ))}
                   </select>
-                  <button
-                    type="button"
-                    onClick={() => generateRecommendations({ refresh: false })}
-                    disabled={recommendationsLoading || !result}
-                    className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-violet-400 to-indigo-400 px-5 text-sm font-medium text-[#100e19] transition hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-200 focus-visible:ring-offset-2 focus-visible:ring-offset-[#101019] disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
-                  >
-                    {recommendationsLoading ? (
-                      <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden="true" />
-                    ) : (
-                      <ArrowRight className="h-4 w-4" aria-hidden="true" />
-                    )}
-                    {recommendationsLoading ? 'Finding your picks' : 'Find my music'}
-                  </button>
                 </div>
               </div>
 
@@ -517,7 +507,23 @@ export function MoodDiscovery() {
                 </div>
               </div>
 
-              {recommendationsLoading && result?.recommendations ? (
+              <div className="mt-5 flex justify-center">
+                <Button
+                  type="button"
+                  onClick={() => generateRecommendations({ refresh: false })}
+                  disabled={recommendationsLoading || !intent}
+                  className="min-h-11 w-full gap-2 focus-visible:ring-offset-2 focus-visible:ring-offset-[#101019] sm:w-auto"
+                >
+                  {recommendationsLoading ? (
+                    <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden="true" />
+                  ) : (
+                    <ArrowRight className="h-4 w-4" aria-hidden="true" />
+                  )}
+                  {recommendationsLoading ? 'Finding your picks' : 'Find my music'}
+                </Button>
+              </div>
+
+              {recommendationsLoading ? (
                 <div className="mt-9 border-t border-white/[0.07] pt-6">
                   <div className="mb-5 flex items-end justify-between gap-4">
                     <div>
@@ -526,7 +532,9 @@ export function MoodDiscovery() {
                         Shaped by your mood, intent, and listening preferences.
                       </p>
                     </div>
-                    <span className="text-xs text-slate-500">Refreshing your picks…</span>
+                    <span className="text-xs text-slate-500">
+                      {result.recommendations ? 'Refreshing your picks…' : 'Finding your picks…'}
+                    </span>
                   </div>
                   <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4">
                     {Array.from({ length: 4 }).map((_, skeletonIndex) => (
