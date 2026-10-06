@@ -7,7 +7,7 @@ import { Headphones, Home, Info, Sparkles } from 'lucide-react';
 const navItems = [
   { label: 'Home', href: '/', icon: Home },
   { label: 'Mood', href: '/mood', icon: Sparkles },
-  { label: 'Recommendations', href: '/recommendations', icon: Headphones },
+  { label: 'Picks', href: '/recommendations', icon: Headphones },
   { label: 'About', href: '/about', icon: Info },
 ];
 
@@ -72,7 +72,7 @@ export function Navbar() {
               }`}
             >
               <Icon className="h-[18px] w-[18px]" aria-hidden="true" />
-              <span>{label === 'Recommendations' ? 'Picks' : label}</span>
+              <span>{label}</span>
             </Link>
           );
         })}
