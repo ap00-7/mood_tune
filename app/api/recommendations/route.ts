@@ -63,6 +63,9 @@ export async function POST(request: Request) {
   const language = typeof input.language === 'string' ? input.language.trim() : 'All';
   const limit = input.limit;
   const offset = input.offset;
+  const excludeTrackIds = Array.isArray(input.excludeTrackIds)
+    ? input.excludeTrackIds.filter((entry): entry is string => typeof entry === 'string' && entry.trim().length > 0)
+    : [];
   if (typeof mood !== 'string' || !moods.includes(mood as Mood)) {
     return NextResponse.json({ error: 'Choose one of the supported moods.' }, { status: 400 });
   }
@@ -112,6 +115,7 @@ export async function POST(request: Request) {
       language,
       limit,
       offset,
+      excludeTrackIds,
       preferences: parsePreferenceProfile(input.preferences),
       context: prediction === null
         ? {

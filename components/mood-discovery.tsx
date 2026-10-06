@@ -11,6 +11,7 @@ import {
   Disc3,
   LoaderCircle,
   Moon,
+  RefreshCw,
   Sparkles,
   Sun,
   Zap,
@@ -152,8 +153,12 @@ export function MoodDiscovery() {
     }
   }
 
-  async function generateRecommendations() {
+  async function generateRecommendations({ refresh = false }: { refresh?: boolean } = {}) {
     if (!result || recommendationsLoading) return;
+    const excludedTrackIds = refresh
+      ? result.recommendations?.map((track) => track.track_id) ?? []
+      : [];
+
     setRecommendationsLoading(true);
     setError('');
     try {
@@ -175,6 +180,7 @@ export function MoodDiscovery() {
             model: result.model,
           },
           preferences,
+          excludeTrackIds: excludedTrackIds,
         }),
       });
       const payload: unknown = await response.json();
@@ -470,20 +476,16 @@ export function MoodDiscovery() {
                   </select>
                   <button
                     type="button"
-                    onClick={generateRecommendations}
-                    disabled={recommendationsLoading}
-                    className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-violet-400 to-indigo-400 px-5 text-sm font-medium text-[#100e19] transition hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-200 focus-visible:ring-offset-2 focus-visible:ring-offset-[#101019] disabled:cursor-wait disabled:opacity-60 sm:w-auto"
+                    onClick={() => generateRecommendations({ refresh: false })}
+                    disabled={recommendationsLoading || !result}
+                    className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-violet-400 to-indigo-400 px-5 text-sm font-medium text-[#100e19] transition hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-200 focus-visible:ring-offset-2 focus-visible:ring-offset-[#101019] disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
                   >
                     {recommendationsLoading ? (
                       <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden="true" />
                     ) : (
                       <ArrowRight className="h-4 w-4" aria-hidden="true" />
                     )}
-                    {recommendationsLoading
-                      ? 'Finding your picks'
-                      : result.recommendations
-                        ? 'Refresh picks'
-                        : 'Find my music'}
+                    {recommendationsLoading ? 'Finding your picks' : 'Find my music'}
                   </button>
                 </div>
               </div>
@@ -515,7 +517,39 @@ export function MoodDiscovery() {
                 </div>
               </div>
 
-              {result.recommendations && result.recommendations.length > 0 ? (
+              {recommendationsLoading && result?.recommendations ? (
+                <div className="mt-9 border-t border-white/[0.07] pt-6">
+                  <div className="mb-5 flex items-end justify-between gap-4">
+                    <div>
+                      <p className="text-sm font-medium text-white">Music for your mood</p>
+                      <p className="mt-1 text-xs text-slate-500">
+                        Shaped by your mood, intent, and listening preferences.
+                      </p>
+                    </div>
+                    <span className="text-xs text-slate-500">Refreshing your picks…</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4">
+                    {Array.from({ length: 4 }).map((_, skeletonIndex) => (
+                      <div
+                        key={`recommendation-skeleton-${skeletonIndex}`}
+                        className="animate-pulse overflow-hidden rounded-[1.1rem] border border-white/[0.06] bg-white/[0.03]"
+                      >
+                        <div className="h-48 w-full bg-white/[0.05]" />
+                        <div className="space-y-3 p-3">
+                          <div className="h-3 w-3/4 rounded bg-white/[0.08]" />
+                          <div className="h-3 w-1/2 rounded bg-white/[0.06]" />
+                          <div className="flex gap-2 pt-2">
+                            <div className="h-8 w-8 rounded-full bg-white/[0.08]" />
+                            <div className="h-8 flex-1 rounded-full bg-white/[0.08]" />
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+
+              {!recommendationsLoading && result?.recommendations && result.recommendations.length > 0 ? (
                 <div className="mt-9 border-t border-white/[0.07] pt-6">
                   <div className="mb-5 flex items-end justify-between gap-4">
                     <div>
@@ -543,14 +577,44 @@ export function MoodDiscovery() {
                       />
                     ))}
                   </div>
+                  <div className="mt-6 flex justify-center">
+                    <button
+                      type="button"
+                      onClick={() => generateRecommendations({ refresh: true })}
+                      disabled={recommendationsLoading}
+                      className="inline-flex items-center gap-2 rounded-full border border-white/[0.1] bg-white/[0.025] px-3.5 py-2 text-xs font-medium text-slate-200 transition hover:border-violet-300/40 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-200 focus-visible:ring-offset-2 focus-visible:ring-offset-[#101019] disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {recommendationsLoading ? (
+                        <LoaderCircle className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
+                      ) : (
+                        <RefreshCw className="h-3.5 w-3.5" aria-hidden="true" />
+                      )}
+                      Get new picks
+                    </button>
+                  </div>
                 </div>
-              ) : result.recommendations && result.recommendations.length === 0 ? (
+              ) : !recommendationsLoading && result?.recommendations && result.recommendations.length === 0 ? (
                 <div className="mt-9 rounded-2xl border border-white/[0.07] bg-black/20 p-6 text-center">
                   <Disc3 className="mx-auto h-7 w-7 text-slate-500" aria-hidden="true" />
                   <p className="mt-3 text-sm font-medium text-white">No fresh picks in this set.</p>
                   <p className="mt-1 text-xs text-slate-500">
                     Try another language, choose a different intent, or refresh for another set.
                   </p>
+                  <div className="mt-5 flex justify-center">
+                    <button
+                      type="button"
+                      onClick={() => generateRecommendations({ refresh: true })}
+                      disabled={recommendationsLoading}
+                      className="inline-flex items-center gap-2 rounded-full border border-white/[0.1] bg-white/[0.025] px-3.5 py-2 text-xs font-medium text-slate-200 transition hover:border-violet-300/40 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-200 focus-visible:ring-offset-2 focus-visible:ring-offset-[#101019] disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {recommendationsLoading ? (
+                        <LoaderCircle className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
+                      ) : (
+                        <RefreshCw className="h-3.5 w-3.5" aria-hidden="true" />
+                      )}
+                      Get new picks
+                    </button>
+                  </div>
                 </div>
               ) : null}
             </div>

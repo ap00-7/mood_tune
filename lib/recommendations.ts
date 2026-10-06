@@ -38,6 +38,7 @@ export type RecommendationRequest = {
   language?: string;
   limit?: number;
   offset?: number;
+  excludeTrackIds?: string[];
   context?: RecommendationContext;
   preferences?: PreferenceProfile;
 };
@@ -317,19 +318,25 @@ export function rankRecommendations(
   tracks: Track[],
   request: RecommendationRequest,
 ): RecommendedTrack[] {
-  const { mood, language = 'All', limit = 5, offset = 0, context, preferences } = request;
+  const { mood, language = 'All', limit = 5, offset = 0, excludeTrackIds = [], context, preferences } = request;
   const skipped = new Set(preferences?.skippedTrackIds ?? []);
-  const seen = new Set<string>();
-  const candidates = tracks.filter((track) => {
-    if (seen.has(track.track_id) || skipped.has(track.track_id)) return false;
-    const matchesMood = context?.allowCrossMood === true || track.mood === mood;
-    const matchesLanguage = language === 'All' || track.language.toLocaleLowerCase() === language.toLocaleLowerCase();
-    if (!matchesMood || !matchesLanguage) return false;
-    seen.add(track.track_id);
-    return true;
-  });
+  const excluded = new Set(excludeTrackIds.filter((trackId) => typeof trackId === 'string' && trackId.trim().length > 0));
 
-  const ranked = candidates
+  const filterCandidates = (trackIdsToExclude: Set<string>) => {
+    const seen = new Set<string>();
+    return tracks.filter((track) => {
+      if (seen.has(track.track_id) || skipped.has(track.track_id) || trackIdsToExclude.has(track.track_id)) return false;
+      const matchesMood = context?.allowCrossMood === true || track.mood === mood;
+      const matchesLanguage = language === 'All' || track.language.toLocaleLowerCase() === language.toLocaleLowerCase();
+      if (!matchesMood || !matchesLanguage) return false;
+      seen.add(track.track_id);
+      return true;
+    });
+  };
+
+  const candidates = filterCandidates(excluded);
+  const fallbackCandidates = excluded.size > 0 ? filterCandidates(new Set()) : candidates;
+  const ranked = (candidates.length > 0 ? candidates : fallbackCandidates)
     .map((track, index) => ({
       track,
       index,
